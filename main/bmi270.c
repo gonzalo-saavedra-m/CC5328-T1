@@ -512,6 +512,89 @@ esp_err_t bmi_init(void)
     return i2c_driver_install(i2c_master_port, conf.mode, 0, 0, 0);
 }
 
+typedef struct {
+    int front, rear; // Índices para el frente y el extremo trasero
+    int size; // Número actual de elementos en la cola
+    int capacity; // Capacidad máxima de la cola
+    int element_size; // Tamaño de cada arreglo interno
+    uint16_t **array; // Doble puntero para arreglos de elementos
+} Queue;
+
+// Función para crear la cola con capacidad especificada
+Queue* createQueue(int capacity, int element_size) {
+    Queue* queue = (Queue*)malloc(sizeof(Queue));
+    if (!queue) {
+        fprintf(stderr, "Error: no se pudo asignar memoria para la cola.\n");
+        return NULL;
+    }
+    queue->front = 0;
+    queue->rear = capacity - 1; // Al final de la capacidad al inicio
+    queue->size = 0; // Inicialmente, la cola está vacía
+    queue->capacity = capacity;
+    queue->element_size = element_size; // Tamaño de cada elemento
+    queue->array = (uint16_t**)malloc(capacity * sizeof(uint16_t*)); // Asignación para la cola
+    for (int i = 0; i < capacity; i++) {
+        queue->array[i] = (uint16_t*)malloc(element_size * sizeof(uint16_t)); // Asignación para cada arreglo
+    }
+    return queue;
+}
+
+// Función para verificar si la cola está llena
+bool isFull(Queue* queue) {
+    return queue->size == queue->capacity;
+}
+
+// Función para verificar si la cola está vacía
+bool isEmpty(Queue* queue) {
+    return queue->size == 0;
+}
+
+// Función para agregar un elemento a la cola (encolar)
+//REVISAR
+void enqueue(Queue* queue, uint16_t* item) {
+    if (queue->size == queue->capacity) {
+        queue->front = (queue->front + 1) % queue->capacity; // Mover el frente para hacer espacio
+        queue->size--; // Reducir el tamaño si la cola está llena
+    }
+
+    queue->rear = (queue->rear + 1) % queue->capacity; // Avanzar el índice del extremo trasero
+    // Copiar el contenido del arreglo proporcionado por el usuario
+    for (int i = 0; i < queue->element_size; i++) {
+        queue->array[queue->rear][i] = item[i];
+    }
+
+    queue->size++; // Incrementar el tamaño de la cola
+}
+
+// Función para eliminar un elemento del frente de la cola (desencolar)
+void dequeue(Queue* queue) {
+    if (isEmpty(queue)) {
+        printf("Error: la cola está vacía, no se puede desencolar.\n");
+        return;
+    }
+
+    queue->front = (queue->front + 1) % queue->capacity;
+    queue->size--; // Reducimos el tamaño porque sacamos un elemento
+}
+
+// Función para obtener el elemento del frente de la cola sin desencolar
+uint16_t* front(Queue* queue) {
+    if (isEmpty(queue)) {
+        printf("Error: la cola está vacía.\n");
+        return NULL;
+    }
+    return queue->array[queue->front];
+}
+
+// Función para obtener el elemento de la parte trasera de la cola sin desencolar
+uint16_t* rear(Queue* queue) {
+    if (isEmpty(queue)) {
+        printf("Error: la cola está vacía.\n");
+        return NULL;
+    }
+    return queue->array[queue->rear];
+}
+
 void chipid(void)
 {
     uint8_t reg_id = 0x00;
@@ -670,11 +753,6 @@ void internal_status(void)
     printf("Internal Status: %2X\n\n", tmp);
 }
 
-void cinco_peaks(int16_t* data_array)
-{
-    return data_arrayp[0];
-}
-
 void lectura(void)
 {
     uint8_t reg_intstatus = 0x03, tmp;
@@ -717,6 +795,67 @@ void lectura(void)
         }
     }
 }
+
+//funcion que recibe tres valores y calcula RMS.
+//el primer valor es resultado de una sumatoria, el segundo es el que se 
+// resta a la sumatoria (hay que elevarlo al cuadrado) y el 
+//tercero, es el valor que se quiere agregar a la sumatoria
+// se debe elevar a 2
+//TODO
+float simple_rms(float x, float y, float z)
+{
+    float sum = x - pow(y, 2) + pow(z, 2);
+    float rms = sqrt(sum)/500;
+    return rms;
+}
+
+//recibe una queue fifo asi [[x1,y1,z1,gx1,gy1,gz1],[x2,y2,z2,gx2,gy2,gz2],...]
+//devuelve una queue asi [[RMS_X, Sum_X], [RMS_Y, Sum_Y], [RMS_Z, Sum_Z], [RMS_GX, Sum_GX], [RMS_GY, Sum_GY], [RMS_GZ, Sum_GZ]]
+//Sum_x = ((x1^2+x2^2+...+xn^2)/500)^1/2
+//TODO: REVISAR TA MAOMENO
+
+Queue* rms(Queue* queue)
+{
+    Queue* queue_rms = createQueue(6,2);
+    float sum_x = 0;
+    float sum_y = 0;
+    float sum_z = 0;
+    float sum_gx = 0;
+    float sum_gy = 0;
+    float sum_gz = 0;
+    for (int i = 0; i < queue->size; i++)
+    {
+        sum_x += pow(queue->array[i][0], 2);
+        sum_y += pow(queue->array[i][1], 2);
+        sum_z += pow(queue->array[i][2], 2);
+        sum_gx += pow(queue->array[i][3], 2);
+        sum_gy += pow(queue->array[i][4], 2);
+        sum_gz += pow(queue->array[i][5], 2);
+    }
+    float rms_x = sqrt(sum_x)/sqrt(500);
+    float rms_y = sqrt(sum_y)/sqrt(500);
+    float rms_z = sqrt(sum_z)/sqrt(500);
+    float rms_gx = sqrt(sum_gx)/sqrt(500);
+    float rms_gy = sqrt(sum_gy)/sqrt(500);
+    float rms_gz = sqrt(sum_gz)/sqrt(500);
+    uint16_t rms_x_sum_x[2] = {rms_x, sum_x};
+    uint16_t rms_y_sum_y[2] = {rms_y, sum_y};
+    uint16_t rms_z_sum_z[2] = {rms_z, sum_z};
+    uint16_t rms_gx_sum_gx[2] = {rms_gx, sum_gx};
+    uint16_t rms_gy_sum_gy[2] = {rms_gy, sum_gy};
+    uint16_t rms_gz_sum_gz[2] = {rms_gz, sum_gz};
+    enqueue(queue_rms, rms_x_sum_x);
+    enqueue(queue_rms, rms_y_sum_y);
+    enqueue(queue_rms, rms_z_sum_z);
+    enqueue(queue_rms, rms_gx_sum_gx);
+    enqueue(queue_rms, rms_gy_sum_gy);
+    enqueue(queue_rms, rms_gz_sum_gz);
+    return queue_rms;
+}
+
+//TODO: FALTA LA NUEVA FUNCION DE LECTURA (debe retornar una Queue)
+
+
 
 void app_main(void)
 {
