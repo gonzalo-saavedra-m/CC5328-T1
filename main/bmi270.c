@@ -576,6 +576,15 @@ int16_t rear(Queue* queue) {
     return queue->array[queue->rear];
 }
 
+int16_t elementI(Queue* queue, int i) {
+    // For itterating over the queue
+    if (i < 0 || i >= queue->size) {
+        printf("Error: índice fuera de rango.\n");
+        return ERROR_CODE;
+    }
+    return queue->array[(queue->front + i) % queue->capacity];
+}
+
 void chipid(void)
 {
     uint8_t reg_id = 0x00;
