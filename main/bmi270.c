@@ -540,7 +540,7 @@ bool isEmpty(Queue* queue) {
     return queue->size == 0;
 }
 
-void enqueue(Queue* queue, uint16_t* item) {
+void enqueue(Queue* queue, int16_t* item) {
     if (isFull(queue)) {
         printf("Error: la cola está llena, no se puede encolar.\n");
         return;
@@ -784,6 +784,11 @@ void lectura(void)
             // printf("acc_x: %f m/s2     acc_y: %f m/s2     acc_z: %f m/s2\n", (int16_t)acc_x * (78.4532 / 32768), (int16_t)acc_y * (78.4532 / 32768), (int16_t)acc_z * (78.4532 / 32768));
             // printf("acc_x: %f g     acc_y: %f g     acc_z: %f g     gyr_x: %f rad/s     gyr_y: %f rad/s      gyr_z: %f rad/s\n", (int16_t)acc_x * (8.000 / 32768), (int16_t)acc_y * (8.000 / 32768), (int16_t)acc_z * (8.000 / 32768), (int16_t)gyr_x * (34.90659 / 32768), (int16_t)gyr_y * (34.90659 / 32768), (int16_t)gyr_z * (34.90659 / 32768));
             printf("acc_x: %f g     acc_y: %f g     acc_z: %f g  \n", acc_x * (8.000 / 32768), acc_y * (8.000 / 32768), acc_z * (8.000 / 32768));
+            if (!isFull(acc_x_queue)) {
+                enqueue(acc_x_queue, &acc_x);
+            } else {
+                printf("Queue is full");
+            }
             // printf("gyr_x: %f rad/s     gyr_y: %f rad/s      gyr_z: %f rad/s\n", (int16_t)gyr_x * (34.90659 / 32768), (int16_t)gyr_y * (34.90659 / 32768), (int16_t)gyr_z * (34.90659 / 32768));
 
             if (ret != ESP_OK)
@@ -796,17 +801,12 @@ void lectura(void)
 
 int16_t top5(Queue* queue) {
     // itter trough the queue and return the 5 highest absolute values
-    int16_t top5[5];
-    int16_t max = 0;
-    int16_t max_index = 0;
+    // TODO: implement
     for (int i = 0; i < queue->size; i++) {
-        int16_t value = queue->array[(queue->front + i) % queue->capacity];
-        if (abs(value) > max) {
-            max = abs(value);
-            max_index = i;
-        }
+        int16_t element = elementI(queue, i);
+        return element;
     }
-
+    return ERROR_CODE;
 }
 
 float simple_rms(float x, float y, float z)
