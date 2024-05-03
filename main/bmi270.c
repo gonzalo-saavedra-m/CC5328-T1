@@ -733,6 +733,38 @@ void normalpowermode(void)
     // printf("Normal power mode: activated. \n\n");
 }
 
+//accel_data[]=burst_read(addr=0x0C, bytes=6) CAMBIAN LOS BYTES
+void lowpowermode(void){
+    // PWR_CTRL: disable auxiliary sensor, gryo acc temp on
+    // 200Hz en datos acc, filter: performance optimized, acc_range +/-8g (1g = 9.80665 m/s2, alcance max: 78.4532 m/s2, 16 bit= 65536 => 1bit = 78.4532/32768 m/s2)
+    // 200Hz en datos gyro, noise filter: performance optimized, filter: performance opt., gyr_range +/-2000dps, 16.4LSB/dps (1 bit= 2000/32768 dps, 34.90659/32768 rad/s)
+    uint8_t reg_pwr_ctrl = 0x7D, val_pwr_ctrl = 0x04;
+    uint8_t reg_acc_conf = 0x40, val_acc_conf = 0x17;
+    uint8_t reg_pwr_conf = 0x7C, val_pwr_conf = 0x02;
+
+    bmi_write(I2C_NUM_0, &reg_pwr_ctrl, &val_pwr_ctrl, 1);
+    bmi_write(I2C_NUM_0, &reg_acc_conf, &val_acc_conf, 1);
+    bmi_write(I2C_NUM_0, &reg_pwr_conf, &val_pwr_conf, 1);
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+}
+
+void performancemode(void){
+    uint8_t reg_pwr_ctrl = 0x7D, val_pwr_ctrl = 0x0E;
+    uint8_t reg_acc_conf = 0x40, val_acc_conf = 0xA8;
+    uint8_t reg_gyr_conf = 0x42, val_gyr_conf = 0xE9;
+    uint8_t reg_pwr_conf = 0x7C, val_pwr_conf = 0x02;
+
+    bmi_write(I2C_NUM_0, &reg_pwr_ctrl, &val_pwr_ctrl, 1);
+    bmi_write(I2C_NUM_0, &reg_acc_conf, &val_acc_conf, 1);
+    bmi_write(I2C_NUM_0, &reg_gyr_conf, &val_gyr_conf, 1);
+    bmi_write(I2C_NUM_0, &reg_pwr_conf, &val_pwr_conf, 1);
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+}
+
 void internal_status(void)
 {
     uint8_t reg_internalstatus = 0x21;
@@ -746,7 +778,7 @@ void internal_status(void)
 void lectura(void)
 {
     uint8_t reg_intstatus = 0x03, tmp;
-    int bytes_data8 = 12;
+    int bytes_data8 = 12; //TODO: cambiar a 6 en lower mode
     uint8_t reg_data = 0x0C, data_data8[bytes_data8];
     int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
 
@@ -809,14 +841,6 @@ int16_t top5(Queue* queue) {
     return ERROR_CODE;
 }
 
-float simple_rms(float x, float y, float z)
-{
-    float sum = x - pow(y, 2) + pow(z, 2);
-    float rms = sqrt(sum)/500;
-    return rms;
-}
-
-
 void app_main(void)
 {
     ESP_ERROR_CHECK(bmi_init());
@@ -829,3 +853,90 @@ void app_main(void)
     printf("Comienza lectura\n\n");
     lectura();
 }
+
+
+
+
+
+
+
+
+
+
+
+//lectura2 retorna un array de int16_t
+
+void lectura2(void){
+    uint8_t reg_intstatus = 0x03, tmp;
+    int bytes_data8 = 12;   //TODO: cambiar a 6 en lower mode
+    uint8_t reg_data = 0x0C, data_data8[bytes_data8];
+    uint16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
+    uint16_t *data_x = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *data_y = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *data_z = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *data_gx = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *data_gy = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *data_gz = (int16_t *)malloc(500 * sizeof(int16_t));
+    uint16_t *rms_x, *rms_y, *rms_z, *rms_gx, *rms_gy, *rms_gz;
+
+    int i = 0;
+    while(i <  500){
+        bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
+        if((tmp & 0b10000000) == 0x80){
+            ret = bmi_read(I2C_NUM_0, &reg_data (uint8_t *)data_data8, bytes_data8);
+            
+            acc_x = ((uint16_t)data_data8[1] << 8) | (uint16_t)data_data8[0];
+            acc_y = ((uint16_t)data_data8[3] << 8) | (uint16_t)data_data8[2];
+            acc_z = ((uint16_t)data_data8[5] << 8) | (uint16_t)data_data8[4];
+
+            gyr_x = ((uint16_t)data_data8[7] << 8) | (uint16_t)data_data8[6];
+            gyr_y = ((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
+            gyr_z = ((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
+
+            data_x[i] = acc_x;
+            data_y[i] = acc_y;
+            data_z[i] = acc_z;
+            data_gx[i] = gyr_x;
+            data_gy[i] = gyr_y;
+            data_gz[i] = gyr_z;
+
+            i++;
+
+            if (ret != ESP_OK)
+            {
+                printf("Error lectura: %s \n", esp_err_to_name(ret));
+            }
+        }
+    }
+
+    rms_x = RMS(data_x);
+    rms_y = RMS(data_y);
+    rms_z = RMS(data_z);
+    rms_gx = RMS(data_gx);
+    rms_gy = RMS(data_gy);
+    rms_gz = RMS(data_gz);
+
+    //TODO: obtener top5 de cada uno de los rms
+    //TODO: obtener top5 de cada data
+    //TODO: Fourier
+}
+
+//retorna un array de uint16_t, donde, por ejemplo, si data es [x,y,z], la funcion rms
+// retorna [rms(x), rms([x,y]), rms([x,y,z])], pero data tiene un tamaño de 500
+//(sum1N(Xi^2)/i)^(1/2)
+uint16_t *RMS(int16_t *data){
+    uint16_t *rms = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    uint16_t sum = 0;
+    for(int i = 0; i < 500; i++){
+        if(i == 0){
+            rms[i] = sqrt(pow(data[i], 2)/(i+1));
+        }
+        else{
+            sum += pow(data[i], 2);
+            rms[i] = sqrt(sum/(i+1));
+        }
+    }
+    return rms;
+}
+
+//TODO: transform to G, m/s2, rad/s
