@@ -1,46 +1,48 @@
+from typing import Tuple
 import serial
 from struct import pack, unpack
 
-# Se configura el puerto y el BAUD_Rate
-PORT = 'COM3'  # Esto depende del sistema operativo
-BAUD_RATE = 115200  # Debe coincidir con la configuracion de la ESP32
+# TODO: Send logs to a text file
+# TODO: Add timeout on the main loop
+class ReceiverController():
+    def __init__(self, port: str, baud_rate: int, timeout: int=5) -> None:
+        self.ser = serial.Serial(port, baud_rate, timeout=5)
+        self.timeout = timeout
 
-# Se abre la conexion serial
-ser = serial.Serial(PORT, BAUD_RATE, timeout = 1)
+    def in_waiting(self) -> bool:
+        return self.ser.in_waiting > 0
 
-# Funciones
-def send_message(message):
-    """ Funcion para enviar un mensaje a la ESP32 """
-    ser.write(message)
+    def write(self, message: bytes) -> None:
+        self.ser.write(message)
 
-def receive_response():
-    """ Funcion para recibir un mensaje de la ESP32 """
-    response = ser.readline()
-    return response
+    def read(self, encoding: str | bytes) -> tuple:
+        return unpack(encoding, self.ser.readline())
 
-def receive_data():
-    """ Funcion que recibe tres floats (fff) de la ESP32 
-    y los imprime en consola """
-    data = receive_response()
-    print(f"Data = {data}")
-    data = unpack("fff", data)
-    print(f'Received: {data}')
-    return data
+    def main(self) -> None:
+        while True:
+            if not self.in_waiting: continue
+            try:
+                raw_data: bytes = self.ser.readline()
+                if b'Beginning initialization' in raw_data:
+                    print('Sengind BEGIN message...')
+                    message = pack('6s', 'BEGIN\0'.encode())
+                    self.write(message)
+                    continue
+                data: Tuple[int] = self.read('fff')
+                # TODO: Define the order of the data
+            except KeyboardInterrupt:
+                print('Keyboard exit. Exiting...')
+                break
+            except Exception:
+                pass
+        end_message: bytes = pack('4s', 'END\0'.encode())
+        self.write(end_message)
+        self.ser.close()
+        print('Connection closed.')
 
-def send_end_message():
-    """ Funcion para enviar un mensaje de finalizacion a la ESP32 """
-    end_message = pack('4s', 'END\0'.encode())
-    ser.write(end_message)
 
-# # Se lee data por la conexion serial
-# counter = 0
-while True:
-    if ser.in_waiting > 0:
-        try:
-            response = ser.readline()
-        except KeyboardInterrupt:
-            print('Finalizando comunicacion')
-            break
-        except:
-            print('Error en leer mensaje')
-            continue
+if __name__ == '__main__':
+    PORT = 'COM3'  # Esto depende del sistema operativo
+    BAUD_RATE = 115200  # Debe coincidir con la configuracion de la ESP32
+    receiver = ReceiverController(PORT, BAUD_RATE)
+    receiver.main()
