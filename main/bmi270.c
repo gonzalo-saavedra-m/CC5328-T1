@@ -514,76 +514,14 @@ esp_err_t bmi_init(void)
 
 const int16_t ERROR_CODE = -1000;
 typedef struct {
-    int front, rear, size;
-    unsigned capacity;
-    int16_t* array;
-} Queue;
-
-Queue* createQueue(unsigned capacity) {
-    Queue* queue = (Queue*)malloc(sizeof(Queue));
-    if (!queue) {
-        fprintf(stderr, "Error: no se pudo asignar memoria para la cola.\n");
-        return NULL;
-    }
-    queue->capacity = capacity;
-    queue->front = queue->size = 0;
-    queue->rear = capacity - 1;
-    queue->array = (int16_t*)malloc(capacity * sizeof(int16_t));
-    return queue;
-}
-
-bool isFull(Queue* queue) {
-    return queue->size == queue->capacity;
-}
-
-bool isEmpty(Queue* queue) {
-    return queue->size == 0;
-}
-
-void enqueue(Queue* queue, int16_t* item) {
-    if (isFull(queue)) {
-        printf("Error: la cola está llena, no se puede encolar.\n");
-        return;
-    }
-    queue->rear = (queue->rear + 1) % queue->capacity; // Avanzar el índice del extremo trasero
-    queue->size++;
-}
-
-int16_t dequeue(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Error: la cola está vacía, no se puede desencolar.\n");
-        return ERROR_CODE;
-    }
-    int16_t item = queue->array[queue->front];
-    queue->front = (queue->front + 1) % queue->capacity;
-    queue->size--;
-    return item;
-}
-
-int16_t front(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Error: la cola está vacía.\n");
-        return ERROR_CODE;
-    }
-    return queue->array[queue->front];
-}
-
-int16_t rear(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Error: la cola está vacía.\n");
-        return ERROR_CODE;
-    }
-    return queue->array[queue->rear];
-}
-
-int16_t elementI(Queue* queue, int i) {
-    // For itterating over the queue
-    if (i < 0 || i >= queue->size) {
-        printf("Error: índice fuera de rango.\n");
-        return ERROR_CODE;
-    }
-    return queue->array[(queue->front + i) % queue->capacity];
-}
+    uint16_t *acc_x;
+    uint16_t *acc_y;
+    uint16_t *acc_z;
+    uint16_t *gyr_x;
+    uint16_t *gyr_y;
+    uint16_t *gyr_z;
+    size_t length; // El número de datos recolectados
+} SensorData;
 
 void chipid(void)
 {
@@ -775,109 +713,128 @@ void internal_status(void)
     printf("Internal Status: %2X\n\n", tmp);
 }
 
-void lectura(void)
-{
-    uint8_t reg_intstatus = 0x03, tmp;
-    int bytes_data8 = 12; //TODO: cambiar a 6 en lower mode
-    uint8_t reg_data = 0x0C, data_data8[bytes_data8];
-    int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
-
-    const int CAPACITY = 500;
-    Queue* acc_x_queue = createQueue(CAPACITY);
-    Queue* acc_y_queue = createQueue(CAPACITY);
-    Queue* acc_z_queue = createQueue(CAPACITY);
-    Queue* gyr_x_queue = createQueue(CAPACITY);
-    Queue* gyr_y_queue = createQueue(CAPACITY);
-    Queue* gyr_z_queue = createQueue(CAPACITY);
-
-    Queue* rms_acc_x_queue = createQueue(CAPACITY);
-    Queue* rms_acc_y_queue = createQueue(CAPACITY);
-    Queue* rms_acc_z_queue = createQueue(CAPACITY);
 
 
-    while (1)
-    {
-        bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
-        // printf("Init_status.0: %x - mask: %x \n", tmp, (tmp & 0b10000000));
-        // ESP_LOGI("leturabmi", "acc_data_ready: %x - mask(80): %x \n", tmp, (tmp & 0b10000000));
 
-        if ((tmp & 0b10000000) == 0x80)
-        {
-            ret = bmi_read(I2C_NUM_0, &reg_data, (uint8_t *)data_data8, bytes_data8);
+// Cambia la unidad a G
+void to_g(uint16_t* data, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        data[i] = data[i] * (8.000 / 32768);
+    }
+}
 
-            acc_x = (int16_t)((uint16_t)data_data8[1] << 8) | (uint16_t)data_data8[0];
-            acc_y = (int16_t)((uint16_t)data_data8[3] << 8) | (uint16_t)data_data8[2];
-            acc_z = (int16_t)((uint16_t)data_data8[5] << 8) | (uint16_t)data_data8[4];
+// Cambia la unidad a m/s^2
+void to_m_s2(uint16_t* data, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        data[i] = data[i] * (78.4532 / 32768);
+    }
+}
 
-            gyr_x = (int16_t)((uint16_t)data_data8[7] << 8) | (uint16_t)data_data8[6];
-            gyr_y = (int16_t)((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
-            gyr_z = (int16_t)((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
+// Se aplica en las medidas de gyro, es decir, gyr_x, gyr_y, gyr_z
+void to_rad_s(uint16_t* data, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        data[i] = data[i] * (34.90659 / 32768);
+    }
+}
 
-            // printf("acc_x: %f m/s2     acc_y: %f m/s2     acc_z: %f m/s2\n", (int16_t)acc_x * (78.4532 / 32768), (int16_t)acc_y * (78.4532 / 32768), (int16_t)acc_z * (78.4532 / 32768));
-            // printf("acc_x: %f g     acc_y: %f g     acc_z: %f g     gyr_x: %f rad/s     gyr_y: %f rad/s      gyr_z: %f rad/s\n", (int16_t)acc_x * (8.000 / 32768), (int16_t)acc_y * (8.000 / 32768), (int16_t)acc_z * (8.000 / 32768), (int16_t)gyr_x * (34.90659 / 32768), (int16_t)gyr_y * (34.90659 / 32768), (int16_t)gyr_z * (34.90659 / 32768));
-            printf("acc_x: %f g     acc_y: %f g     acc_z: %f g  \n", acc_x * (8.000 / 32768), acc_y * (8.000 / 32768), acc_z * (8.000 / 32768));
-            if (!isFull(acc_x_queue)) {
-                enqueue(acc_x_queue, &acc_x);
-            } else {
-                printf("Queue is full");
+//retorna un array de uint16_t, donde, por ejemplo, si data es [x,y,z], la funcion rms
+// retorna [rms(x), rms([x,y]), rms([x,y,z])], pero data tiene un tamaño de 500
+//(sum1N(Xi^2)/i)^(1/2).
+uint16_t* RMS(int16_t* data, size_t length) {
+    // Verifica que el puntero y el tamaño sean válidos
+    if (data == NULL || length == 0) {
+        return NULL;
+    }
+
+    // Asigna memoria para el resultado RMS
+    uint16_t* rms = (uint16_t*)malloc(length * sizeof(uint16_t));
+    if (rms == NULL) {
+        return NULL; // Fallo en la asignación de memoria
+    }
+
+    // Variable para acumular la suma de los cuadrados
+    uint64_t sum_of_squares = 0;
+
+    // Calcula el RMS incrementalmente
+    for (size_t i = 0; i < length; i++) {
+        sum_of_squares += (uint64_t)data[i] * data[i];
+        rms[i] = (uint16_t)sqrt(sum_of_squares / (double)(i + 1));
+    }
+    return rms; // Retorna el array de RMS
+}
+
+//top5 
+// Inserta un valor en un arreglo de top5 manteniendo el orden descendente
+void insert_into_top5(uint16_t* top5, uint16_t value) {
+    for (int i = 0; i < 5; i++) {
+        if (value > top5[i]) {
+            // Desplaza los elementos hacia abajo para hacer espacio
+            for (int j = 4; j > i; j--) {
+                top5[j] = top5[j - 1];
             }
-            // printf("gyr_x: %f rad/s     gyr_y: %f rad/s      gyr_z: %f rad/s\n", (int16_t)gyr_x * (34.90659 / 32768), (int16_t)gyr_y * (34.90659 / 32768), (int16_t)gyr_z * (34.90659 / 32768));
-
-            if (ret != ESP_OK)
-            {
-                printf("Error lectura: %s \n", esp_err_to_name(ret));
-            }
+            top5[i] = value; // Inserta el nuevo valor en el lugar adecuado
+            break; // Sale del bucle después de insertar
         }
     }
 }
 
-int16_t top5(Queue* queue) {
-    // itter trough the queue and return the 5 highest absolute values
-    // TODO: implement
-    for (int i = 0; i < queue->size; i++) {
-        int16_t element = elementI(queue, i);
-        return element;
+// Encuentra los cinco valores más altos manteniendo el orden original
+uint16_t* top5(const uint16_t* data, size_t length) {
+    if (data == NULL || length < 5) {
+        return NULL;
     }
-    return ERROR_CODE;
+
+    uint16_t* top5 = (uint16_t*)malloc(5 * sizeof(uint16_t));
+    if (top5 == NULL) {
+        return NULL; // Fallo en la asignación de memoria
+    }
+
+    // Inicializa el arreglo de top5 con los cinco primeros valores
+    for (int i = 0; i < 5; i++) {
+        top5[i] = data[i];
+    }
+
+    // Ordena el arreglo de top5 en orden descendente
+    for (int i = 1; i < 5; i++) {
+        insert_into_top5(top5, top5[i]);
+    }
+
+    // Recorre el arreglo original y actualiza los cinco valores más altos
+    for (size_t i = 5; i < length; i++) {
+        insert_into_top5(top5, data[i]);
+    }
+
+    return top5;
 }
-
-void app_main(void)
-{
-    ESP_ERROR_CHECK(bmi_init());
-    softreset();
-    chipid();
-    initialization();
-    check_initialization();
-    normalpowermode();
-    internal_status();
-    printf("Comienza lectura\n\n");
-    lectura();
-}
-
-
-
-
-
-
-
-
-
 
 
 //lectura2 retorna un array de int16_t
+SensorData lectura2(void){
+    SensorData data;
+    //asigna memoria
+    data.acc_x = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.acc_y = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.acc_z = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.gyr_x = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.gyr_y = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.gyr_z = (uint16_t *)malloc(500 * sizeof(uint16_t));
 
-void lectura2(void){
     uint8_t reg_intstatus = 0x03, tmp;
     int bytes_data8 = 12;   //TODO: cambiar a 6 en lower mode
     uint8_t reg_data = 0x0C, data_data8[bytes_data8];
     uint16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
-    uint16_t *data_x = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *data_y = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *data_z = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *data_gx = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *data_gy = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *data_gz = (int16_t *)malloc(500 * sizeof(int16_t));
-    uint16_t *rms_x, *rms_y, *rms_z, *rms_gx, *rms_gy, *rms_gz;
+
+    if (!data.acc_x || !data.acc_y || !data.acc_z || !data.gyr_x || !data.gyr_y || !data.gyr_z) {
+        // Si alguna asignación falla, liberar memoria y devolver un dato vacío
+        if (data.acc_x) free(data.acc_x);
+        if (data.acc_y) free(data.acc_y);
+        if (data.acc_z) free(data.acc_z);
+        if (data.gyr_x) free(data.gyr_x);
+        if (data.gyr_y) free(data.gyr_y);
+        if (data.gyr_z) free(data.gyr_z);
+        data.length = 0;
+        return data;
+    }
 
     int i = 0;
     while(i <  500){
@@ -893,50 +850,45 @@ void lectura2(void){
             gyr_y = ((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
             gyr_z = ((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
 
-            data_x[i] = acc_x;
-            data_y[i] = acc_y;
-            data_z[i] = acc_z;
-            data_gx[i] = gyr_x;
-            data_gy[i] = gyr_y;
-            data_gz[i] = gyr_z;
-
-            i++;
+            data.acc_x[i] = acc_x;
+            data.acc_y[i] = acc_y;
+            data.acc_z[i] = acc_z;
+            data.gyr_x[i] = gyr_x;
+            data.gyr_y[i] = gyr_y;
+            data.gyr_z[i] = gyr_z;
 
             if (ret != ESP_OK)
             {
                 printf("Error lectura: %s \n", esp_err_to_name(ret));
             }
+
+            i++;
         }
     }
-
-    rms_x = RMS(data_x);
-    rms_y = RMS(data_y);
-    rms_z = RMS(data_z);
-    rms_gx = RMS(data_gx);
-    rms_gy = RMS(data_gy);
-    rms_gz = RMS(data_gz);
-
-    //TODO: obtener top5 de cada uno de los rms
-    //TODO: obtener top5 de cada data
-    //TODO: Fourier
+    data.length = i;
+    return data;
 }
 
-//retorna un array de uint16_t, donde, por ejemplo, si data es [x,y,z], la funcion rms
-// retorna [rms(x), rms([x,y]), rms([x,y,z])], pero data tiene un tamaño de 500
-//(sum1N(Xi^2)/i)^(1/2)
-uint16_t *RMS(int16_t *data){
-    uint16_t *rms = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    uint16_t sum = 0;
-    for(int i = 0; i < 500; i++){
-        if(i == 0){
-            rms[i] = sqrt(pow(data[i], 2)/(i+1));
-        }
-        else{
-            sum += pow(data[i], 2);
-            rms[i] = sqrt(sum/(i+1));
-        }
-    }
-    return rms;
+
+//TODO: Aplicar funciones de arriba, hay funciones que no existen
+void app_main(void)
+{
+    ESP_ERROR_CHECK(bmi_init());
+    softreset();
+    chipid();
+    initialization();
+    check_initialization();
+    normalpowermode();
+    internal_status();
+    printf("Comienza lectura\n\n");
+    lectura();
 }
+
+// int compare_desc(const void *a, const void *b) {
+//     return (*(uint16_t *)b - *(uint16_t *)a);
+// }
 
 //TODO: transform to G, m/s2, rad/s
+//TODO: obtener top5 de cada uno de los rms
+//TODO: obtener top5 de cada data
+//TODO: Fourier
