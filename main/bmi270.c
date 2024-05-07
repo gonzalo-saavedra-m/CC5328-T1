@@ -778,17 +778,16 @@ void insert_into_top5(uint16_t* top5, uint16_t value) {
     }
 }
 
+uint16_t* top5 = (uint16_t*)malloc(5 * sizeof(uint16_t));
 // Encuentra los cinco valores más altos manteniendo el orden original
 uint16_t* top5(const uint16_t* data, size_t length) {
     if (data == NULL || length < 5) {
         return NULL;
     }
 
-    uint16_t* top5 = (uint16_t*)malloc(5 * sizeof(uint16_t));
     if (top5 == NULL) {
         return NULL; // Fallo en la asignación de memoria
     }
-
     // Inicializa el arreglo de top5 con los cinco primeros valores
     for (int i = 0; i < 5; i++) {
         top5[i] = data[i];
@@ -808,8 +807,8 @@ uint16_t* top5(const uint16_t* data, size_t length) {
 }
 
 
-//lectura2 retorna un array de int16_t
-SensorData lectura2(void){
+//lectura retorna un array de int16_t
+SensorData lectura(void){
     SensorData data;
     //asigna memoria
     data.acc_x = (uint16_t *)malloc(500 * sizeof(uint16_t));
@@ -881,7 +880,7 @@ void app_main(void)
     normalpowermode();
     internal_status();
     printf("Comienza lectura\n\n");
-    lectura2();
+    lectura();
 }
 
 // int compare_desc(const void *a, const void *b) {
