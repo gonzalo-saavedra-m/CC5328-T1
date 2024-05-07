@@ -840,7 +840,7 @@ SensorData lectura2(void){
     while(i <  500){
         bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
         if((tmp & 0b10000000) == 0x80){
-            ret = bmi_read(I2C_NUM_0, &reg_data (uint8_t *)data_data8, bytes_data8);
+            ret = bmi_read(I2C_NUM_0, &reg_data, (uint8_t *)data_data8, bytes_data8);
             
             acc_x = ((uint16_t)data_data8[1] << 8) | (uint16_t)data_data8[0];
             acc_y = ((uint16_t)data_data8[3] << 8) | (uint16_t)data_data8[2];
@@ -881,7 +881,7 @@ void app_main(void)
     normalpowermode();
     internal_status();
     printf("Comienza lectura\n\n");
-    lectura();
+    lectura2();
 }
 
 // int compare_desc(const void *a, const void *b) {
