@@ -24,6 +24,8 @@ esp_err_t ret  = ESP_OK;
 esp_err_t ret2 = ESP_OK;
 
 uint16_t val0[6];
+const int16_t ERROR_CODE = -1000;
+const size_t DATA_LENGTH = 500;
 
 /*! @name  Global array that stores the configuration file of BMI270 */
 const uint8_t bmi270_config_file[] = {
@@ -512,14 +514,13 @@ esp_err_t bmi_init(void)
     return i2c_driver_install(i2c_master_port, conf.mode, 0, 0, 0);
 }
 
-const int16_t ERROR_CODE = -1000;
 typedef struct {
-    uint16_t *acc_x;
-    uint16_t *acc_y;
-    uint16_t *acc_z;
-    uint16_t *gyr_x;
-    uint16_t *gyr_y;
-    uint16_t *gyr_z;
+    int16_t *acc_x;
+    int16_t *acc_y;
+    int16_t *acc_z;
+    int16_t *gyr_x;
+    int16_t *gyr_y;
+    int16_t *gyr_z;
     size_t length; // El número de datos recolectados
 } SensorData;
 
@@ -713,115 +714,64 @@ void internal_status(void)
     printf("Internal Status: %2X\n\n", tmp);
 }
 
-
-
-
-// Cambia la unidad a G
-void to_g(uint16_t* data, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        data[i] = data[i] * (8.000 / 32768);
-    }
+int16_t to_g(int16_t raw_value) {
+    return raw_value * (8.000 / 32768);
 }
 
-// Cambia la unidad a m/s^2
-void to_m_s2(uint16_t* data, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        data[i] = data[i] * (78.4532 / 32768);
-    }
+int16_t to_m_s2(int16_t raw_value) {
+    return raw_value * (78.4532 / 32768);
 }
 
-// Se aplica en las medidas de gyro, es decir, gyr_x, gyr_y, gyr_z
-void to_rad_s(uint16_t* data, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        data[i] = data[i] * (34.90659 / 32768);
-    }
+// Para las lecturas del giroscopio
+int16_t to_rad_s(int16_t raw_value) {
+    return raw_value * (34.90659 / 32768);
 }
 
-//retorna un array de uint16_t, donde, por ejemplo, si data es [x,y,z], la funcion rms
-// retorna [rms(x), rms([x,y]), rms([x,y,z])], pero data tiene un tamaño de 500
-//(sum1N(Xi^2)/i)^(1/2).
-uint16_t* RMS(int16_t* data, size_t length) {
-    // Verifica que el puntero y el tamaño sean válidos
-    if (data == NULL || length == 0) {
+/*
+*   Calcula los RMS en el tiempo a partir de un array de valores.
+    *   @param values: Array de valores de entrada
+    *   @param length: Número de elementos en el array
+    *   @param results: Array de salida para los valores RMS
+    *   @return: void. Los resultados se almacenan en el array de salida
+*/
+void RMS(int16_t* values, int16_t* results, size_t length) {
+    if (values == NULL || length == 0 || results == NULL) {
+        printf("Datos de entrada inválidos\n");
         return NULL;
     }
-
-    // Asigna memoria para el resultado RMS
-    uint16_t* rms = (uint16_t*)malloc(length * sizeof(uint16_t));
-    if (rms == NULL) {
-        return NULL; // Fallo en la asignación de memoria
-    }
-
-    // Variable para acumular la suma de los cuadrados
-    uint64_t sum_of_squares = 0;
-
-    // Calcula el RMS incrementalmente
+    int16_t sum_of_squares = 0;
     for (size_t i = 0; i < length; i++) {
-        sum_of_squares += (uint64_t)data[i] * data[i];
-        rms[i] = (uint16_t)sqrt(sum_of_squares / (double)(i + 1));
-    }
-    return rms; // Retorna el array de RMS
-}
-
-//top5 
-// Inserta un valor en un arreglo de top5 manteniendo el orden descendente
-void insert_into_top5(uint16_t* top5, uint16_t value) {
-    for (int i = 0; i < 5; i++) {
-        if (value > top5[i]) {
-            // Desplaza los elementos hacia abajo para hacer espacio
-            for (int j = 4; j > i; j--) {
-                top5[j] = top5[j - 1];
-            }
-            top5[i] = value; // Inserta el nuevo valor en el lugar adecuado
-            break; // Sale del bucle después de insertar
-        }
+        sum_of_squares += (int16_t)pow(values[i], 2);
+        results[i] = (int16_t)sqrt(sum_of_squares / (double)(i + 1));
     }
 }
 
-uint16_t* top5 = (uint16_t*)malloc(5 * sizeof(uint16_t));
-// Encuentra los cinco valores más altos manteniendo el orden original
-uint16_t* top5(const uint16_t* data, size_t length) {
-    if (data == NULL || length < 5) {
-        return NULL;
-    }
-
-    if (top5 == NULL) {
-        return NULL; // Fallo en la asignación de memoria
-    }
-    // Inicializa el arreglo de top5 con los cinco primeros valores
+void top5(int16_t* values, int16_t* top5) {
+    // TODO: Implementar
     for (int i = 0; i < 5; i++) {
-        top5[i] = data[i];
+        top5[i] = values[i];
     }
-
-    // Ordena el arreglo de top5 en orden descendente
-    for (int i = 1; i < 5; i++) {
-        insert_into_top5(top5, top5[i]);
-    }
-
-    // Recorre el arreglo original y actualiza los cinco valores más altos
-    for (size_t i = 5; i < length; i++) {
-        insert_into_top5(top5, data[i]);
-    }
-
-    return top5;
 }
 
 
 //lectura retorna un array de int16_t
-SensorData lectura(void){
+SensorData lectura(void) {
     SensorData data;
     //asigna memoria
-    data.acc_x = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    data.acc_y = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    data.acc_z = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    data.gyr_x = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    data.gyr_y = (uint16_t *)malloc(500 * sizeof(uint16_t));
-    data.gyr_z = (uint16_t *)malloc(500 * sizeof(uint16_t));
+    data.acc_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.acc_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.acc_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.gyr_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.gyr_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.gyr_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    data.length = DATA_LENGTH;
+    int16_t* RMS = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
+    int16_t* top5 = (int16_t*)malloc(5 * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
 
     uint8_t reg_intstatus = 0x03, tmp;
     int bytes_data8 = 12;   //TODO: cambiar a 6 en lower mode
     uint8_t reg_data = 0x0C, data_data8[bytes_data8];
-    uint16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
+    int16_t acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z;
 
     if (!data.acc_x || !data.acc_y || !data.acc_z || !data.gyr_x || !data.gyr_y || !data.gyr_z) {
         // Si alguna asignación falla, liberar memoria y devolver un dato vacío
@@ -834,20 +784,18 @@ SensorData lectura(void){
         data.length = 0;
         return data;
     }
-
-    int i = 0;
-    while(i <  500){
+    for (int i = 0; i < DATA_LENGTH; i++) {
         bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
         if((tmp & 0b10000000) == 0x80){
             ret = bmi_read(I2C_NUM_0, &reg_data, (uint8_t *)data_data8, bytes_data8);
-            
-            acc_x = ((uint16_t)data_data8[1] << 8) | (uint16_t)data_data8[0];
-            acc_y = ((uint16_t)data_data8[3] << 8) | (uint16_t)data_data8[2];
-            acc_z = ((uint16_t)data_data8[5] << 8) | (uint16_t)data_data8[4];
 
-            gyr_x = ((uint16_t)data_data8[7] << 8) | (uint16_t)data_data8[6];
-            gyr_y = ((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
-            gyr_z = ((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
+            acc_x = (int16_t)((uint16_t)data_data8[1] << 8) | (uint16_t)data_data8[0];
+            acc_y = (int16_t)((uint16_t)data_data8[3] << 8) | (uint16_t)data_data8[2];
+            acc_z = (int16_t)((uint16_t)data_data8[5] << 8) | (uint16_t)data_data8[4];
+
+            gyr_x = (int16_t)((uint16_t)data_data8[7] << 8) | (uint16_t)data_data8[6];
+            gyr_y = (int16_t)((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
+            gyr_z = (int16_t)((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
 
             data.acc_x[i] = acc_x;
             data.acc_y[i] = acc_y;
@@ -860,11 +808,11 @@ SensorData lectura(void){
             {
                 printf("Error lectura: %s \n", esp_err_to_name(ret));
             }
-
-            i++;
         }
     }
-    data.length = i;
+    for (int i = 0; i < DATA_LENGTH; i++) {
+        printf("Lectura %i: acc_x: %i, acc_y: %i, acc_z: %i, gyr_x: %i, gyr_y: %i, gyr_z: %i\n", i, data.acc_x[i], data.acc_y[i], data.acc_z[i], data.gyr_x[i], data.gyr_y[i], data.gyr_z[i]);
+    }
     return data;
 }
 
