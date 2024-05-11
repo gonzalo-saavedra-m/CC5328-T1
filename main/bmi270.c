@@ -865,6 +865,12 @@ void lectura(void) {
             }
         }
     }
+    for (int i = 0; i < DATA_LENGTH; i++) {
+        int16_t rawDataToSend[6] = {data.acc_x[i], data.acc_y[i], data.acc_z[i], data.gyr_x[i], data.gyr_y[i], data.gyr_z[i]};
+        const char* dataToSend = (const char*)rawDataToSend;
+        int len = sizeof(int16_t) * 6;
+        uart_write_bytes(UART_NUM, dataToSend, len);
+    }
     uart_write_bytes(UART_NUM,"FINISHED_READINGS\0",18);
     char datarResponse2[10];
     while(1) {
