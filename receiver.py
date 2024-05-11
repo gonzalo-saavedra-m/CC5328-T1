@@ -1,6 +1,8 @@
 from typing import Tuple
 import serial
 from struct import pack, unpack
+import sys
+from pprint import pprint
 
 # COMUNICATION CONSTANTS
 READY = b'READY'
@@ -15,10 +17,10 @@ FINISHED_PEAKS = b'FINISHED_PEAKS'
 SHUTDOWN = pack('9s', 'SHUTDOWN\0'.encode())
 
 class ReceiverController():
-    def __init__(self, port: str, baud_rate: int, timeout: int=5) -> None:
+    def __init__(self, port: str, baud_rate: int, verbose: bool=False) -> None:
         self.ser = serial.Serial(port, baud_rate, timeout=5)
-        self.timeout = timeout
         self.reset_data() # Initialize the data dictionaries.
+        self.verbose = verbose
 
     def reset_data(self) -> None:
         self.acc = {
@@ -77,32 +79,36 @@ class ReceiverController():
             self.gyr['y'].append(data[4])
             self.gyr['z'].append(data[5])
 
-    def read_RMS(self, entry: bytes, output: str) -> None:
-        data = None
+    def read_RMS(self, entry: bytes) -> None:
         try:
-            data = unpack('f', entry)[0]
+            data = unpack('ff', entry)
+            output_parser = ['acc_x', 'acc_y', 'acc_z', 'gyr_x', 'gyr_y', 'gyr_z']
+            output = output_parser[data[0]]
+            self.RMS[output].append(data[1])
         except:
-            print(f'Problem reading RMS entry: {entry}. Appending None.')
-        finally:
-            self.RMS[output].append(data)
+            self.print(f'Problem reading RMS entry: {entry}. Skipping...')
 
-    def read_FFT(self, entry: bytes, output: str) -> None:
-        data = None
+    def read_FFT(self, entry: bytes) -> None:
         try:
-            data = unpack('f', entry)
+            data = unpack('ff', entry)
+            output_parser = ['acc_x', 'acc_y', 'acc_z']
+            output = output_parser[data[0]]
+            self.FFT[output].append(data[1])
         except:
-            print(f'Problem reading FFT entry: {entry}. Appending None.')
-        finally:
-            self.FFT[output].append(data)
+            self.print(f'Problem reading FFT entry: {entry}. Skipping...')
 
-    def read_peaks(self, entry: bytes, output: str) -> None:
-        data = (None, None, None, None, None)
+    def read_peaks(self, entry: bytes) -> None:
         try:
-            data = unpack('fffff', entry)
+            data = unpack('ffffff', entry)
+            output_parser = ['RMS.acc_x', 'RMS.acc_y', 'RMS.acc_z', 'RMS.gyr_x', 'RMS.gyr_y', 'RMS.gyr_z', 'acc_x', 'acc_y', 'acc_z']
+            output = output_parser[data[0]]
+            self.peaks[output] = data[1:]
         except:
-            print(f'Problem reading peaks entry: {entry}. Appending None.')
-        finally:
-            self.peaks[output].append(data)
+            self.print(f'Problem reading peaks entry: {entry}. Skipping...')
+
+    def print(self, entry) -> None:
+        if self.verbose:
+            print(entry)
 
     def main(self) -> None:
         while True:
@@ -111,6 +117,7 @@ class ReceiverController():
                 raw_data: bytes = self.ser.readline()
                 if READY in raw_data:
                     print('Received READY message.')
+                    input('Press Enter to start the data acquisition process...')
                     print('Sending BEGIN_READINGS message.')
                     self.write(BEGIN_READINGS)
                 while True:
@@ -147,18 +154,31 @@ class ReceiverController():
                         print('Received FINISHED_PEAKS message.')
                         break
                     self.read_peaks(raw_data, 'acc_x')
+                print('Data acquisition process finished. Printing data...')
+                print('Acceleration values:')
+                pprint(self.acc)
+                print('Gyroscope values:')
+                pprint(self.gyr)
+                print('RMS values:')
+                pprint(self.RMS)
+                print('FFT values:')
+                pprint(self.FFT)
+                print('Peaks values:')
+                pprint(self.peaks)
+
             except Exception as e:
-                print('An error occurred:', e)
+                self.print('An error occurred:', e)
             finally:
-                print('Sending SHUTDOWN message...')
+                self.print('Sending SHUTDOWN message...')
                 self.write(SHUTDOWN)
                 self.ser.close()
-                print('Connection closed.')
+                self.print('Connection closed.')
                 break
 
 
 if __name__ == '__main__':
     PORT = 'COM3'  # Esto depende del sistema operativo
     BAUD_RATE = 115200  # Debe coincidir con la configuracion de la ESP32
+    verbose = 'verbose' in sys.argv or '-v' in sys.argv
     receiver = ReceiverController(PORT, BAUD_RATE)
     receiver.main()
