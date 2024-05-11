@@ -3,11 +3,40 @@
 #include "driver/i2c.h"
 #include "sdkconfig.h"
 #include "math.h"
-// #include "bmi270.h"
-// #include "bmi2.h"
-// #include "common.h"
-// #include "freertos/FreeRTOS.h"
-// #include"struct.h"
+
+// --- Del aux 2 ---
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+#include "freertos/FreeRTOS.h"
+#include "driver/uart.h"
+#include "freertos/task.h"
+
+#define BUF_SIZE (128) // buffer size
+#define TXD_PIN 1  // UART TX pin
+#define RXD_PIN 3  // UART RX pin
+#define UART_NUM UART_NUM_0   // UART port number
+#define BAUD_RATE 115200   // Baud rate
+
+static void uart_setup() {
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    };
+    uart_param_config(UART_NUM_0, &uart_config);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
+}
+
+int serial_read(char *buffer, int size){
+    int len = uart_read_bytes(UART_NUM, (uint8_t*)buffer, size, pdMS_TO_TICKS(1000));
+    return len;
+}
+// -----------------
 
 #define I2C_MASTER_SCL_IO         GPIO_NUM_22 // GPIO pin
 #define I2C_MASTER_SDA_IO         GPIO_NUM_21 // GPIO pin
@@ -734,7 +763,7 @@ int16_t to_rad_s(int16_t raw_value) {
     *   @param results: Array de salida para los valores RMS
     *   @return: void. Los resultados se almacenan en el array de salida
 */
-void RMS(int16_t* values, int16_t* results, size_t length) {
+void calc_RMS(int16_t* values, int16_t* results, size_t length) {
     if (values == NULL || length == 0 || results == NULL) {
         printf("Datos de entrada inválidos\n");
         return NULL;
@@ -755,7 +784,7 @@ void top5(int16_t* values, int16_t* top5) {
 
 
 //lectura retorna un array de int16_t
-SensorData lectura(void) {
+void lectura(void) {
     SensorData data;
     //asigna memoria
     data.acc_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
@@ -765,7 +794,16 @@ SensorData lectura(void) {
     data.gyr_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
     data.gyr_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
     data.length = DATA_LENGTH;
-    int16_t* RMS = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
+
+    SensorData RMS;
+    RMS.acc_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.acc_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.acc_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.gyr_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.gyr_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.gyr_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
+    RMS.length = DATA_LENGTH;
+
     int16_t* top5 = (int16_t*)malloc(5 * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
 
     uint8_t reg_intstatus = 0x03, tmp;
@@ -781,8 +819,25 @@ SensorData lectura(void) {
         if (data.gyr_x) free(data.gyr_x);
         if (data.gyr_y) free(data.gyr_y);
         if (data.gyr_z) free(data.gyr_z);
+        if (RMS.acc_x) free(RMS.acc_x);
+        if (RMS.acc_y) free(RMS.acc_y);
+        if (RMS.acc_z) free(RMS.acc_z);
+        if (RMS.gyr_x) free(RMS.gyr_x);
+        if (RMS.gyr_y) free(RMS.gyr_y);
+        if (RMS.gyr_z) free(RMS.gyr_z);
+        if (top5) free(top5);
         data.length = 0;
-        return data;
+        return;
+    }
+    uart_write_bytes(UART_NUM,"READY\0",6);
+    char dataResponse1[15];
+    while(1) {
+        int rLen = serial_read(dataResponse1, 15);
+        if (rLen > 0) {
+            if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
+                break;
+            }
+        }
     }
     for (int i = 0; i < DATA_LENGTH; i++) {
         bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
@@ -810,10 +865,59 @@ SensorData lectura(void) {
             }
         }
     }
-    for (int i = 0; i < DATA_LENGTH; i++) {
-        printf("Lectura %i: acc_x: %i, acc_y: %i, acc_z: %i, gyr_x: %i, gyr_y: %i, gyr_z: %i\n", i, data.acc_x[i], data.acc_y[i], data.acc_z[i], data.gyr_x[i], data.gyr_y[i], data.gyr_z[i]);
+    uart_write_bytes(UART_NUM,"FINISHED_READINGS\0",18);
+    char datarResponse2[10];
+    while(1) {
+        int rLen = serial_read(datarResponse2, 10);
+        if (rLen > 0) {
+            if (strcmp(datarResponse2, "BEGIN_RMS") == 0) {
+                break;
+            }
+        }
     }
-    return data;
+    // Calcular RMS
+    // calc_RMS(data.acc_x, RMS.acc_x, data.length);
+    uart_write_bytes(UART_NUM,"FINISHED_RMS\0",13);
+    char dataResponse3[10];
+    while(1) {
+        int rLen = serial_read(dataResponse3, 10);
+        if (rLen > 0) {
+            if (strcmp(dataResponse3, "BEGIN_FFT") == 0) {
+                break;
+            }
+        }
+    }
+    // Calcular FFT
+    // ...
+    uart_write_bytes(UART_NUM,"FINISHED_FFT\0",13);
+    char dataResponse4[12];
+    while(1) {
+        int rLen = serial_read(dataResponse4, 12);
+        if (rLen > 0) {
+            if (strcmp(dataResponse4, "BEGIN_PEAKS") == 0) {
+                break;
+            }
+        }
+    }
+    // Calcular top5
+    // top5(data.acc_x, top5);
+    uart_write_bytes(UART_NUM,"FINISHED_PEAKS\0",15);
+
+    // Free memory
+    free(data.acc_x);
+    free(data.acc_y);
+    free(data.acc_z);
+    free(data.gyr_x);
+    free(data.gyr_y);
+    free(data.gyr_z);
+    free(RMS.acc_x);
+    free(RMS.acc_y);
+    free(RMS.acc_z);
+    free(RMS.gyr_x);
+    free(RMS.gyr_y);
+    free(RMS.gyr_z);
+    free(top5);
+    return;
 }
 
 
@@ -827,7 +931,7 @@ void app_main(void)
     check_initialization();
     normalpowermode();
     internal_status();
-    printf("Comienza lectura\n\n");
+    uart_setup();
     lectura();
 }
 
