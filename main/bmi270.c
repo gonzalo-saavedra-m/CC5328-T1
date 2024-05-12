@@ -17,6 +17,7 @@
 #define RXD_PIN 3  // UART RX pin
 #define UART_NUM UART_NUM_0   // UART port number
 #define BAUD_RATE 115200   // Baud rate
+#define M_PI 3.14159
 
 static void uart_setup() {
     uart_config_t uart_config = {
@@ -756,6 +757,36 @@ int16_t to_rad_s(int16_t raw_value) {
     return raw_value * (34.90659 / 32768);
 }
 
+/**
+ * @brief Funcion que calcula la FFT de un arreglo y guarda el resultado inplace
+ *
+ * @param array Arreglo de elementos sobre los que se quiere calcular la FFT
+ * @param size Tamano del arreglo
+ * @param array_re Direccion del arreglo donde se guardara la parte real. Debe ser de tamano size
+ * @param array_im Direccion del arreglo donde se guardara la parte imaginaria. Debe ser de tamano size
+ */
+
+void calc_FFT(int16_t *array, int size, float *array_re, float *array_im) {
+    for (int k = 0; k < size; k++) {
+        float real = 0;
+        float imag = 0;
+
+        for (int n = 0; n < size; n++) {
+            float angulo = 2 * M_PI * k * n / size;
+            float cos_angulo = cos(angulo);
+            float sin_angulo = -sin(angulo);
+
+            real += array[n] * cos_angulo;
+            imag += array[n] * sin_angulo;
+        }
+        real /= size;
+        imag /= size;
+        array_re[k] = real;
+        array_im[k] = imag;
+    }
+}
+
+
 /*
 *   Calcula los RMS en el tiempo a partir de un array de valores.
     *   @param values: Array de valores de entrada
@@ -774,6 +805,8 @@ void calc_RMS(int16_t* values, int16_t* results, size_t length) {
         results[i] = (int16_t)sqrt(sum_of_squares / (double)(i + 1));
     }
 }
+
+
 
 void top5(int16_t* values, int16_t* top5) {
     // TODO: Implementar
@@ -805,6 +838,25 @@ void lectura(void) {
     RMS.length = DATA_LENGTH;
 
     int16_t* top5 = (int16_t*)malloc(5 * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
+
+    //version fea de arreglos para guardar los datos de fft para cada eje
+    float* fft_acc_x_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_acc_x_im = (float*)malloc(DATA_LENGTH * sizeof(float));
+    
+    float* fft_acc_y_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_acc_y_im = (float*)malloc(DATA_LENGTH * sizeof(float));
+
+    float* fft_acc_z_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_acc_z_im = (float*)malloc(DATA_LENGTH * sizeof(float));
+
+    float* fft_gyr_x_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_gyr_x_im = (float*)malloc(DATA_LENGTH * sizeof(float));
+
+    float* fft_gyr_y_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_gyr_y_im = (float*)malloc(DATA_LENGTH * sizeof(float));
+
+    float* fft_gyr_z_re = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* fft_gyr_z_im = (float*)malloc(DATA_LENGTH * sizeof(float));
 
     uint8_t reg_intstatus = 0x03, tmp;
     int bytes_data8 = 12;   //TODO: cambiar a 6 en lower mode
@@ -883,8 +935,42 @@ void lectura(void) {
     }
     // Calcular RMS
     // calc_RMS(data.acc_x, RMS.acc_x, data.length);
+    calc_RMS(data.acc_x, RMS.acc_x, data.length);
+    calc_RMS(data.acc_y, RMS.acc_y, data.length);
+    calc_RMS(data.acc_z, RMS.acc_z, data.length);
+    calc_RMS(data.gyr_x, RMS.gyr_x, data.length);
+    calc_RMS(data.gyr_y, RMS.gyr_y, data.length);
+    calc_RMS(data.gyr_z, RMS.gyr_z, data.length);
+
+    // TODO:cambiar unidades m/s2, rad/s, g
+    //Send RMS data
+    const char* dataToSend = (const char*)RMS.acc_x;
+    int len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)RMS.acc_y;
+    len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)RMS.acc_z;
+    len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)RMS.gyr_x;
+    len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)RMS.gyr_y;
+    len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)RMS.gyr_z;
+    len = sizeof(int16_t) * RMS.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
     uart_write_bytes(UART_NUM,"FINISHED_RMS\0",13);
     char dataResponse3[10];
+
     while(1) {
         int rLen = serial_read(dataResponse3, 10);
         if (rLen > 0) {
@@ -894,7 +980,62 @@ void lectura(void) {
         }
     }
     // Calcular FFT
-    // ...
+    calc_FFT(data.acc_x, data.length, fft_acc_x_re, fft_acc_x_im);
+    calc_FFT(data.acc_y, data.length, fft_acc_y_re, fft_acc_y_im);
+    calc_FFT(data.acc_z, data.length, fft_acc_z_re, fft_acc_z_im);
+    calc_FFT(data.gyr_x, data.length, fft_gyr_x_re, fft_gyr_x_im);
+    calc_FFT(data.gyr_y, data.length, fft_gyr_y_re, fft_gyr_y_im);
+    calc_FFT(data.gyr_z, data.length, fft_gyr_z_re, fft_gyr_z_im);
+
+    //Send FFT data
+    dataToSend = (const char*)fft_acc_x_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_acc_x_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_acc_y_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_acc_y_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_acc_z_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_acc_z_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_x_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_x_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_y_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_y_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_z_re;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
+    dataToSend = (const char*)fft_gyr_z_im;
+    len = sizeof(int16_t) * data.length;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+
     uart_write_bytes(UART_NUM,"FINISHED_FFT\0",13);
     char dataResponse4[12];
     while(1) {
@@ -923,6 +1064,18 @@ void lectura(void) {
     free(RMS.gyr_y);
     free(RMS.gyr_z);
     free(top5);
+    free(fft_acc_x_re);
+    free(fft_acc_x_im);
+    free(fft_acc_y_re);
+    free(fft_acc_y_im);
+    free(fft_acc_z_re);
+    free(fft_acc_z_im);
+    free(fft_gyr_x_re);
+    free(fft_gyr_x_im);
+    free(fft_gyr_y_re);
+    free(fft_gyr_y_im);
+    free(fft_gyr_z_re);
+    free(fft_gyr_z_im);
     return;
 }
 
