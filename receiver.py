@@ -41,9 +41,15 @@ class ReceiverController():
             'gyr_z': []
         }
         self.FFT = {
-            'acc_x': [],
-            'acc_y': [],
-            'acc_z': [],
+            'acc_x': {
+                'r': [],
+                'i': []},
+            'acc_y': {
+                'r': [],
+                'i': []},
+            'acc_z': {
+                'r': [],
+                'i': []},
         }
         self.peaks = {
             'RMS.acc_x': [],
@@ -134,13 +140,24 @@ class ReceiverController():
             self.RMS['gyr_z'] = data[500:]
             print('Sending BEGIN_FFT message...')
             self.write(BEGIN_FFT)
+            byte_data = []
             while True:
                 if not self.in_waiting: continue
                 raw_data = self.ser.readline()
                 if FINISHED_FFT in raw_data:
                     print('Received FINISHED_FFT message.')
                     break
-                self.read_FFT(raw_data)
+                else:
+                    byte_data.append(raw_data)
+            byte_data = b''.join(byte_data)
+            byte_data = byte_data[:-1] # Remove the last '\n' character
+            data = unpack('600f', byte_data)
+            self.FFT['acc_x']['r'] = data[:100]
+            self.FFT['acc_x']['i'] = data[100:200]
+            self.FFT['acc_y']['r'] = data[200:300]
+            self.FFT['acc_y']['i'] = data[300:400]
+            self.FFT['acc_z']['r'] = data[400:500]
+            self.FFT['acc_z']['i'] = data[500:]
             print('Sending BEGIN_PEAKS message...')
             self.write(BEGIN_PEAKS)
             while True:

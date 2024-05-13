@@ -974,62 +974,33 @@ void lectura(void) {
             }
         }
     }
-    // // Calcular FFT
-    // calc_FFT(data.acc_x, data.length, fft_acc_x_re, fft_acc_x_im);
-    // calc_FFT(data.acc_y, data.length, fft_acc_y_re, fft_acc_y_im);
-    // calc_FFT(data.acc_z, data.length, fft_acc_z_re, fft_acc_z_im);
-    // calc_FFT(data.gyr_x, data.length, fft_gyr_x_re, fft_gyr_x_im);
-    // calc_FFT(data.gyr_y, data.length, fft_gyr_y_re, fft_gyr_y_im);
-    // calc_FFT(data.gyr_z, data.length, fft_gyr_z_re, fft_gyr_z_im);
+    // Calcular FFT
+    calc_FFT(data.acc_x, data.length, fft_acc_x_re, fft_acc_x_im);
+    calc_FFT(data.acc_y, data.length, fft_acc_y_re, fft_acc_y_im);
+    calc_FFT(data.acc_z, data.length, fft_acc_z_re, fft_acc_z_im);
+    calc_FFT(data.gyr_x, data.length, fft_gyr_x_re, fft_gyr_x_im);
+    calc_FFT(data.gyr_y, data.length, fft_gyr_y_re, fft_gyr_y_im);
+    calc_FFT(data.gyr_z, data.length, fft_gyr_z_re, fft_gyr_z_im);
 
-    // //Send FFT data
-    // dataToSend = (const char*)fft_acc_x_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    //Send FFT data
+    dataToSend = (const char*)fft_acc_x_re;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)fft_acc_x_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)fft_acc_x_im;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)fft_acc_y_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)fft_acc_y_re;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)fft_acc_y_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)fft_acc_y_im;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)fft_acc_z_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)fft_acc_z_re;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)fft_acc_z_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_x_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_x_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_y_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_y_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_z_re;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
-
-    // dataToSend = (const char*)fft_gyr_z_im;
-    // len = sizeof(int16_t) * data.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)fft_acc_z_im;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+    uart_write_bytes(UART_NUM, "\n", 1);
 
     uart_write_bytes(UART_NUM,"FINISHED_FFT\0",13);
     char dataResponse4[12];
