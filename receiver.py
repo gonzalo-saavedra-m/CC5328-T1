@@ -35,10 +35,7 @@ class ReceiverController():
         self.RMS = {
             'acc_x': [],
             'acc_y': [],
-            'acc_z': [],
-            'gyr_x': [],
-            'gyr_y': [],
-            'gyr_z': []
+            'acc_z': []
         }
         self.FFT = {
             'acc_x': {
@@ -55,12 +52,9 @@ class ReceiverController():
             'RMS.acc_x': [],
             'RMS.acc_y': [],
             'RMS.acc_z': [],
-            'RMS.gyr_x': [],
-            'RMS.gyr_y': [],
-            'RMS.gyr_z': [],
             'acc_x': [],
             'acc_y': [],
-            'acc_z': [],
+            'acc_z': []
         }
 
     def in_waiting(self) -> bool:
@@ -80,15 +74,6 @@ class ReceiverController():
             self.gyr['z'].append(data[5])
         except Exception as e:
             print(f'Problem reading data entry: {entry}. Skipping...')
-
-    def read_FFT(self, entry: bytes) -> None:
-        try:
-            data = unpack('2f', entry[:-1])
-            output_parser = ['acc_x', 'acc_y', 'acc_z']
-            output = output_parser[data[0]]
-            self.FFT[output].append(data[1])
-        except:
-            print(f'Problem reading FFT entry: {entry}. Skipping...')
 
     def read_peaks(self, entry: bytes) -> None:
         try:
@@ -131,13 +116,10 @@ class ReceiverController():
                     byte_data.append(raw_data)
             byte_data = b''.join(byte_data)
             byte_data = byte_data[:-1]
-            data = unpack('600f', byte_data)
+            data = unpack('300f', byte_data)
             self.RMS['acc_x'] = data[:100]
             self.RMS['acc_y'] = data[100:200]
-            self.RMS['acc_z'] = data[200:300]
-            self.RMS['gyr_x'] = data[300:400]
-            self.RMS['gyr_y'] = data[400:500]
-            self.RMS['gyr_z'] = data[500:]
+            self.RMS['acc_z'] = data[200:]
             print('Sending BEGIN_FFT message...')
             self.write(BEGIN_FFT)
             byte_data = []
