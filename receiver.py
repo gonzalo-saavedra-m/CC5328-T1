@@ -65,30 +65,19 @@ class ReceiverController():
 
     def read_data_line(self, entry: bytes) -> None:
         try:
-            data = unpack('ffffff', entry[:-1])
+            data = unpack('6f', entry[:-1])
             self.acc['x'].append(data[0])
             self.acc['y'].append(data[1])
             self.acc['z'].append(data[2])
             self.gyr['x'].append(data[3])
             self.gyr['y'].append(data[4])
             self.gyr['z'].append(data[5])
-            print(f'Appending data: {data}.')
         except Exception as e:
             print(f'Problem reading data entry: {entry}. Skipping...')
-            raise(e)
-
-    def read_RMS(self, entry: bytes) -> None:
-        try:
-            data = unpack('ff', entry)
-            output_parser = ['acc_x', 'acc_y', 'acc_z', 'gyr_x', 'gyr_y', 'gyr_z']
-            output = output_parser[data[0]]
-            self.RMS[output].append(data[1])
-        except:
-            print(f'Problem reading RMS entry: {entry}. Skipping...')
 
     def read_FFT(self, entry: bytes) -> None:
         try:
-            data = unpack('ff', entry)
+            data = unpack('2f', entry[:-1])
             output_parser = ['acc_x', 'acc_y', 'acc_z']
             output = output_parser[data[0]]
             self.FFT[output].append(data[1])
@@ -97,7 +86,7 @@ class ReceiverController():
 
     def read_peaks(self, entry: bytes) -> None:
         try:
-            data = unpack('ffffff', entry)
+            data = unpack('6f', entry[:-1])
             output_parser = ['RMS.acc_x', 'RMS.acc_y', 'RMS.acc_z', 'RMS.gyr_x', 'RMS.gyr_y', 'RMS.gyr_z', 'acc_x', 'acc_y', 'acc_z']
             output = output_parser[data[0]]
             self.peaks[output] = data[1:]
@@ -119,20 +108,30 @@ class ReceiverController():
             while True:
                 if not self.in_waiting: continue
                 raw_data = self.ser.readline()
-                print(f'Received {raw_data}')
                 if FINISHED_READINGS in raw_data:
                     print('Received FINISHED_READINGS message.')
                     break
                 self.read_data_line(raw_data)
             print('Sending BEGIN_RMS message...')
             self.write(BEGIN_RMS)
+            byte_data = []
             while True:
                 if not self.in_waiting: continue
                 raw_data = self.ser.readline()
                 if FINISHED_RMS in raw_data:
                     print('Received FINISHED_RMS message.')
                     break
-                self.read_RMS(raw_data)
+                else:
+                    byte_data.append(raw_data)
+            byte_data = b''.join(byte_data)
+            byte_data = byte_data[:-1]
+            data = unpack('600f', byte_data)
+            self.RMS['acc_x'] = data[:100]
+            self.RMS['acc_y'] = data[100:200]
+            self.RMS['acc_z'] = data[200:300]
+            self.RMS['gyr_x'] = data[300:400]
+            self.RMS['gyr_y'] = data[400:500]
+            self.RMS['gyr_z'] = data[500:]
             print('Sending BEGIN_FFT message...')
             self.write(BEGIN_FFT)
             while True:

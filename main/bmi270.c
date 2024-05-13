@@ -55,7 +55,7 @@ esp_err_t ret2 = ESP_OK;
 
 uint16_t val0[6];
 const int16_t ERROR_CODE = -1000;
-const size_t DATA_LENGTH = 10;
+const size_t DATA_LENGTH = 100;
 
 /*! @name  Global array that stores the configuration file of BMI270 */
 const uint8_t bmi270_config_file[] = {
@@ -794,15 +794,15 @@ void calc_FFT(int16_t *array, int size, float *array_re, float *array_im) {
     *   @param results: Array de salida para los valores RMS
     *   @return: void. Los resultados se almacenan en el array de salida
 */
-void calc_RMS(int16_t* values, int16_t* results, size_t length) {
+void calc_RMS(int16_t* values, float* results, size_t length) {
     if (values == NULL || length == 0 || results == NULL) {
         printf("Datos de entrada inválidos\n");
         return;
     }
-    int16_t sum_of_squares = 0;
+    float sum_of_squares = 0;
     for (size_t i = 0; i < length; i++) {
-        sum_of_squares += (int16_t)pow(values[i], 2);
-        results[i] = (int16_t)sqrt(sum_of_squares / (double)(i + 1));
+        sum_of_squares += (float)pow(values[i], 2);
+        results[i] = (float)sqrt(sum_of_squares / (double)(i + 1));
     }
 }
 
@@ -828,14 +828,12 @@ void lectura(void) {
     data.gyr_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
     data.length = DATA_LENGTH;
 
-    SensorData RMS;
-    RMS.acc_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.acc_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.acc_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.gyr_x = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.gyr_y = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.gyr_z = (int16_t*)malloc(DATA_LENGTH * sizeof(int16_t));
-    RMS.length = DATA_LENGTH;
+    float* RMS_acc_x = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* RMS_acc_y = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* RMS_acc_z = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* RMS_gyr_x = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* RMS_gyr_y = (float*)malloc(DATA_LENGTH * sizeof(float));
+    float* RMS_gyr_z = (float*)malloc(DATA_LENGTH * sizeof(float));
 
     int16_t* top5 = (int16_t*)malloc(5 * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
 
@@ -871,15 +869,25 @@ void lectura(void) {
         if (data.gyr_x) free(data.gyr_x);
         if (data.gyr_y) free(data.gyr_y);
         if (data.gyr_z) free(data.gyr_z);
-        if (RMS.acc_x) free(RMS.acc_x);
-        if (RMS.acc_y) free(RMS.acc_y);
-        if (RMS.acc_z) free(RMS.acc_z);
-        if (RMS.gyr_x) free(RMS.gyr_x);
-        if (RMS.gyr_y) free(RMS.gyr_y);
-        if (RMS.gyr_z) free(RMS.gyr_z);
+        if (RMS_acc_x) free(RMS_acc_x);
+        if (RMS_acc_y) free(RMS_acc_y);
+        if (RMS_acc_z) free(RMS_acc_z);
+        if (RMS_gyr_x) free(RMS_gyr_x);
+        if (RMS_gyr_y) free(RMS_gyr_y);
+        if (RMS_gyr_z) free(RMS_gyr_z);
         if (top5) free(top5);
         data.length = 0;
         return;
+    }
+    uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
+    char dataResponse1[15];
+    while(1) {
+        int rLen = serial_read(dataResponse1, 15);
+        if (rLen > 0) {
+            if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
+                break;
+            }
+        }
     }
     for (int i = 0; i < DATA_LENGTH; i++) {
         bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
@@ -907,18 +915,8 @@ void lectura(void) {
             }
         }
     }
-    uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
-    char dataResponse1[15];
-    while(1) {
-        int rLen = serial_read(dataResponse1, 15);
-        if (rLen > 0) {
-            if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
-                break;
-            }
-        }
-    }
     for (int i = 0; i < DATA_LENGTH; i++) {
-        float rawDataToSend[6] = {data.acc_x[i], data.acc_y[i], data.acc_z[i], data.gyr_x[i], data.gyr_y[i], data.gyr_z[i]};
+        float rawDataToSend[6] = {to_m_s2(data.acc_x[i]), to_m_s2(data.acc_y[i]), to_m_s2(data.acc_z[i]), to_rad_s(data.gyr_x[i]), to_rad_s(data.gyr_y[i]), to_rad_s(data.gyr_z[i])};
         const char* dataToSend = (const char*)rawDataToSend;
         int len = sizeof(float) * 6;
         uart_write_bytes(UART_NUM, dataToSend, len);
@@ -934,40 +932,36 @@ void lectura(void) {
             }
         }
     }
-    // // Calcular RMS
-    // // calc_RMS(data.acc_x, RMS.acc_x, data.length);
+    // Calcular RMS
     // calc_RMS(data.acc_x, RMS.acc_x, data.length);
-    // calc_RMS(data.acc_y, RMS.acc_y, data.length);
-    // calc_RMS(data.acc_z, RMS.acc_z, data.length);
-    // calc_RMS(data.gyr_x, RMS.gyr_x, data.length);
-    // calc_RMS(data.gyr_y, RMS.gyr_y, data.length);
-    // calc_RMS(data.gyr_z, RMS.gyr_z, data.length);
+    calc_RMS(data.acc_x, RMS_acc_x, data.length);
+    calc_RMS(data.acc_y, RMS_acc_y, data.length);
+    calc_RMS(data.acc_z, RMS_acc_z, data.length);
+    calc_RMS(data.gyr_x, RMS_gyr_x, data.length);
+    calc_RMS(data.gyr_y, RMS_gyr_y, data.length);
+    calc_RMS(data.gyr_z, RMS_gyr_z, data.length);
 
-    // // TODO:cambiar unidades m/s2, rad/s, g
-    // //Send RMS data
-    // const char* dataToSend = (const char*)RMS.acc_x;
-    // int len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    // TODO:cambiar unidades m/s2, rad/s, g
+    //Send RMS data
+    const char* dataToSend = (const char*)RMS_acc_x;
+    int len = sizeof(float) * DATA_LENGTH;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)RMS.acc_y;
-    // len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)RMS_acc_y;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)RMS.acc_z;
-    // len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)RMS_acc_z;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)RMS.gyr_x;
-    // len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)RMS_gyr_x;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)RMS.gyr_y;
-    // len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)RMS_gyr_y;
+    uart_write_bytes(UART_NUM, dataToSend, len);
 
-    // dataToSend = (const char*)RMS.gyr_z;
-    // len = sizeof(int16_t) * RMS.length;
-    // uart_write_bytes(UART_NUM, dataToSend, len);
+    dataToSend = (const char*)RMS_gyr_z;
+    uart_write_bytes(UART_NUM, dataToSend, len);
+    uart_write_bytes(UART_NUM, "\n", 1);
 
     uart_write_bytes(UART_NUM,"FINISHED_RMS\0",13);
     char dataResponse3[10];
@@ -1058,12 +1052,12 @@ void lectura(void) {
     free(data.gyr_x);
     free(data.gyr_y);
     free(data.gyr_z);
-    free(RMS.acc_x);
-    free(RMS.acc_y);
-    free(RMS.acc_z);
-    free(RMS.gyr_x);
-    free(RMS.gyr_y);
-    free(RMS.gyr_z);
+    free(RMS_acc_x);
+    free(RMS_acc_y);
+    free(RMS_acc_z);
+    free(RMS_gyr_x);
+    free(RMS_gyr_y);
+    free(RMS_gyr_z);
     free(top5);
     free(fft_acc_x_re);
     free(fft_acc_x_im);
