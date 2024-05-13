@@ -806,12 +806,15 @@ void calc_RMS(int16_t* values, float* results, size_t length) {
     }
 }
 
+int compare_desc(const void *a, const void *b) {
+    return (*(uint16_t *)b - *(uint16_t *)a);
+}
 
-
-void top5(int16_t* values, int16_t* top5) {
-    // TODO: Implementar
+//top5 sorts the values in descending order and stores the top 5 values in the top5 array
+void top5(int16_t* values, float* top5) {
+    qsort(values, DATA_LENGTH, sizeof(int16_t), compare_desc);
     for (int i = 0; i < 5; i++) {
-        top5[i] = values[i];
+        top5[i] = (float)values[i];
     }
 }
 
@@ -835,7 +838,7 @@ void lectura(void) {
     float* RMS_gyr_y = (float*)malloc(DATA_LENGTH * sizeof(float));
     float* RMS_gyr_z = (float*)malloc(DATA_LENGTH * sizeof(float));
 
-    int16_t* top5 = (int16_t*)malloc(5 * sizeof(int16_t)); // Se va a ir sobreescribiendo por cada eje.
+    float* top5 = (float*)malloc(5 * sizeof(float)); // Se va a ir sobreescribiendo por cada eje.
 
     //version fea de arreglos para guardar los datos de fft para cada eje
     float* fft_acc_x_re = (float*)malloc(DATA_LENGTH * sizeof(float));
@@ -1012,8 +1015,47 @@ void lectura(void) {
             }
         }
     }
-    // Calcular top5
-    // top5(data.acc_x, top5);
+    // Calcular top5 data
+    top5(data.acc_x, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(data.acc_y, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(data.acc_z, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));  
+
+    top5(data.gyr_x, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(data.gyr_y, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(data.gyr_z, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    uart_write_bytes(UART_NUM, "\n", 1);
+
+    //Calcular top5 RMS
+    top5(RMS_acc_x, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(RMS_acc_y, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    top5(RMS_acc_z, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
+
+    uart_write_bytes(UART_NUM, "\n", 1);
     uart_write_bytes(UART_NUM,"FINISHED_PEAKS\0",15);
 
     // Free memory
@@ -1060,9 +1102,7 @@ void app_main(void)
     lectura();
 }
 
-// int compare_desc(const void *a, const void *b) {
-//     return (*(uint16_t *)b - *(uint16_t *)a);
-// }
+
 
 //TODO: transform to G, m/s2, rad/s
 //TODO: obtener top5 de cada uno de los rms
