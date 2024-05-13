@@ -952,15 +952,6 @@ void lectura(void) {
 
     dataToSend = (const char*)RMS_acc_z;
     uart_write_bytes(UART_NUM, dataToSend, len);
-
-    dataToSend = (const char*)RMS_gyr_x;
-    uart_write_bytes(UART_NUM, dataToSend, len);
-
-    dataToSend = (const char*)RMS_gyr_y;
-    uart_write_bytes(UART_NUM, dataToSend, len);
-
-    dataToSend = (const char*)RMS_gyr_z;
-    uart_write_bytes(UART_NUM, dataToSend, len);
     uart_write_bytes(UART_NUM, "\n", 1);
 
     uart_write_bytes(UART_NUM,"FINISHED_RMS\0",13);
