@@ -6,6 +6,7 @@ from pprint import pprint
 # COMUNICATION CONSTANTS
 READY = b'READY_TO_START'
 BEGIN_READINGS = pack('15s', 'BEGIN_READINGS\0'.encode())
+STOP__READINGS = pack('15s', 'STOP__READINGS\0'.encode())
 FINISHED_READINGS = b'FINISHED_READINGS'
 BEGIN_RMS = pack('10s', 'BEGIN_RMS\0'.encode())
 FINISHED_RMS = b'FINISHED_RMS'
@@ -78,15 +79,6 @@ class ReceiverController():
         except Exception as e:
             print(f'Problem reading data entry: {entry}. Skipping...')
 
-    def read_peaks(self, entry: bytes) -> None:
-        try:
-            data = unpack('6f', entry[:-1])
-            output_parser = ['RMS.acc_x', 'RMS.acc_y', 'RMS.acc_z', 'acc_x', 'acc_y', 'acc_z']
-            output = output_parser[data[0]]
-            self.peaks[output] = data[1:]
-        except:
-            print(f'Problem reading peaks entry: {entry}. Skipping...')
-
     def main(self) -> None:
         try:
             while True:
@@ -95,88 +87,91 @@ class ReceiverController():
                 print(raw_data)
                 if READY in raw_data:
                     print('Received READY message.')
-                    input('Press Enter to start the data acquisition process...')
+                    user_input = input('Press ENTER to start data acquisition or type "exit" to finish the program: ')
+                    if user_input == 'exit':
+                        break
                     print('Sending BEGIN_READINGS message.')
                     self.write(BEGIN_READINGS)
-                    break
-            while True:
-                if not self.in_waiting: continue
-                raw_data = self.ser.readline()
-                if FINISHED_READINGS in raw_data:
-                    print('Received FINISHED_READINGS message.')
-                    break
-                self.read_data_line(raw_data)
-            print('Sending BEGIN_RMS message...')
-            self.write(BEGIN_RMS)
-            byte_data = []
-            while True:
-                if not self.in_waiting: continue
-                raw_data = self.ser.readline()
-                if FINISHED_RMS in raw_data:
-                    print('Received FINISHED_RMS message.')
-                    break
                 else:
-                    byte_data.append(raw_data)
-            byte_data = b''.join(byte_data)
-            byte_data = byte_data[:-1]
-            data = unpack(f'{self.data_size*3}f', byte_data)
-            self.RMS['acc_x'] = data[:self.data_size]
-            self.RMS['acc_y'] = data[self.data_size:2*self.data_size]
-            self.RMS['acc_z'] = data[2*self.data_size:]
-            print('Sending BEGIN_FFT message...')
-            self.write(BEGIN_FFT)
-            byte_data = []
-            while True:
-                if not self.in_waiting: continue
-                raw_data = self.ser.readline()
-                if FINISHED_FFT in raw_data:
-                    print('Received FINISHED_FFT message.')
-                    break
-                else:
-                    byte_data.append(raw_data)
-            byte_data = b''.join(byte_data)
-            byte_data = byte_data[:-1] # Remove the last '\n' character
-            data = unpack(f'{self.data_size*6}f', byte_data)
-            self.FFT['acc_x']['r'] = data[:self.data_size]
-            self.FFT['acc_x']['i'] = data[self.data_size:2*self.data_size]
-            self.FFT['acc_y']['r'] = data[2*self.data_size:3*self.data_size]
-            self.FFT['acc_y']['i'] = data[3*self.data_size:4*self.data_size]
-            self.FFT['acc_z']['r'] = data[4*self.data_size:5*self.data_size]
-            self.FFT['acc_z']['i'] = data[5*self.data_size:]
-            print('Sending BEGIN_PEAKS message...')
-            self.write(BEGIN_PEAKS)
-            byte_data = []
-            while True:
-                if not self.in_waiting: continue
-                raw_data = self.ser.readline()
-                if FINISHED_PEAKS in raw_data:
-                    print('Received FINISHED_PEAKS message.')
-                    break
-                else:
-                    byte_data.append(raw_data)
-            byte_data = b''.join(byte_data)
-            byte_data = byte_data[:-1]
-            data = unpack('45f', byte_data)
-            self.peaks['acc_x'] = data[:5]
-            self.peaks['acc_y'] = data[5:10]
-            self.peaks['acc_z'] = data[10:15]
-            self.peaks['gyr_x'] = data[15:20]
-            self.peaks['gyr_y'] = data[20:25]
-            self.peaks['gyr_z'] = data[25:30]
-            self.peaks['RMS.acc_x'] = data[30:35]
-            self.peaks['RMS.acc_y'] = data[35:40]
-            self.peaks['RMS.acc_z'] = data[40:]
-            print('Data acquisition process finished. Printing data...')
-            print('Acceleration values:')
-            print(self.acc)
-            print('Gyroscope values:')
-            print(self.gyr)
-            print('RMS values:')
-            print(self.RMS)
-            print('FFT values:')
-            print(self.FFT)
-            print('Peaks values:')
-            pprint(self.peaks)
+                    continue
+                while True:
+                    if not self.in_waiting: continue
+                    raw_data = self.ser.readline()
+                    if FINISHED_READINGS in raw_data:
+                        print('Received FINISHED_READINGS message.')
+                        break
+                    self.read_data_line(raw_data)
+                print('Sending BEGIN_RMS message...')
+                self.write(BEGIN_RMS)
+                byte_data = []
+                while True:
+                    if not self.in_waiting: continue
+                    raw_data = self.ser.readline()
+                    if FINISHED_RMS in raw_data:
+                        print('Received FINISHED_RMS message.')
+                        break
+                    else:
+                        byte_data.append(raw_data)
+                byte_data = b''.join(byte_data)
+                byte_data = byte_data[:-1]
+                data = unpack(f'{self.data_size*3}f', byte_data)
+                self.RMS['acc_x'] = data[:self.data_size]
+                self.RMS['acc_y'] = data[self.data_size:2*self.data_size]
+                self.RMS['acc_z'] = data[2*self.data_size:]
+                print('Sending BEGIN_FFT message...')
+                self.write(BEGIN_FFT)
+                byte_data = []
+                while True:
+                    if not self.in_waiting: continue
+                    raw_data = self.ser.readline()
+                    if FINISHED_FFT in raw_data:
+                        print('Received FINISHED_FFT message.')
+                        break
+                    else:
+                        byte_data.append(raw_data)
+                byte_data = b''.join(byte_data)
+                byte_data = byte_data[:-1] # Remove the last '\n' character
+                data = unpack(f'{self.data_size*6}f', byte_data)
+                self.FFT['acc_x']['r'] = data[:self.data_size]
+                self.FFT['acc_x']['i'] = data[self.data_size:2*self.data_size]
+                self.FFT['acc_y']['r'] = data[2*self.data_size:3*self.data_size]
+                self.FFT['acc_y']['i'] = data[3*self.data_size:4*self.data_size]
+                self.FFT['acc_z']['r'] = data[4*self.data_size:5*self.data_size]
+                self.FFT['acc_z']['i'] = data[5*self.data_size:]
+                print('Sending BEGIN_PEAKS message...')
+                self.write(BEGIN_PEAKS)
+                byte_data = []
+                while True:
+                    if not self.in_waiting: continue
+                    raw_data = self.ser.readline()
+                    if FINISHED_PEAKS in raw_data:
+                        print('Received FINISHED_PEAKS message.')
+                        break
+                    else:
+                        byte_data.append(raw_data)
+                byte_data = b''.join(byte_data)
+                byte_data = byte_data[:-1]
+                data = unpack('45f', byte_data)
+                self.peaks['acc_x'] = data[:5]
+                self.peaks['acc_y'] = data[5:10]
+                self.peaks['acc_z'] = data[10:15]
+                self.peaks['gyr_x'] = data[15:20]
+                self.peaks['gyr_y'] = data[20:25]
+                self.peaks['gyr_z'] = data[25:30]
+                self.peaks['RMS.acc_x'] = data[30:35]
+                self.peaks['RMS.acc_y'] = data[35:40]
+                self.peaks['RMS.acc_z'] = data[40:]
+                print('Data acquisition process finished. Printing data...')
+                print('Acceleration values:')
+                print(self.acc)
+                print('Gyroscope values:')
+                print(self.gyr)
+                print('RMS values:')
+                print(self.RMS)
+                print('FFT values:')
+                print(self.FFT)
+                print('Peaks values:')
+                pprint(self.peaks)
 
         except Exception as e:
             print(f'An error occurred: {e}')

@@ -895,16 +895,6 @@ void lectura(void) {
         data.length = 0;
         return;
     }
-    uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
-    char dataResponse1[15];
-    while(1) {
-        int rLen = serial_read(dataResponse1, 15);
-        if (rLen > 0) {
-            if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
-                break;
-            }
-        }
-    }
     for (int i = 0; i < DATA_LENGTH; i++) {
         bmi_read(I2C_NUM_0, &reg_intstatus, &tmp, 1);
         if((tmp & 0b10000000) == 0x80){
@@ -1096,10 +1086,27 @@ void app_main(void)
     chipid();
     initialization();
     check_initialization();
-    normalpowermode();
+    performancemode();
     internal_status();
     uart_setup();
-    lectura();
+    while (1) {
+        uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
+        char dataResponse1[15];
+        while(1) {
+            int rLen = serial_read(dataResponse1, 15);
+            if (rLen > 0) {
+                if ((strcmp(dataResponse1, "BEGIN_READINGS") == 0) || (strcmp(dataResponse1, "STOP__READINGS") == 0)) {
+                    break;
+                }
+            }
+        }
+        if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
+            lectura();
+            printf("Lectura finalizada, volviendo al comienzo del loop...\n");
+        } else {
+            break;
+        }
+    }
 }
 
 
