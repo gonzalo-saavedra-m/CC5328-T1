@@ -807,7 +807,7 @@ void calc_RMS(int16_t* values, float* results, size_t length) {
 }
 
 int compare_desc(const void *a, const void *b) {
-    return (*(uint16_t *)b - *(uint16_t *)a);
+    return (*(float *)b - *(float *)a);
 }
 
 //top5 sorts the values in descending order and stores the top 5 values in the top5 array
@@ -815,6 +815,13 @@ void calc_top5(int16_t* values, float* top5) {
     qsort(values, DATA_LENGTH, sizeof(int16_t), compare_desc);
     for (int i = 0; i < 5; i++) {
         top5[i] = (float)values[i];
+    }
+}
+
+void calc_top5_float(float* values, float* top5) {
+    qsort(values, DATA_LENGTH, sizeof(float), compare_desc);
+    for (int i = 0; i < 5; i++) {
+        top5[i] = values[i];
     }
 }
 
@@ -1031,15 +1038,15 @@ void lectura(void) {
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    calc_top5(RMS_acc_x, top5);
+    calc_top5_float(RMS_acc_x, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    calc_top5(RMS_acc_y, top5);
+    calc_top5_float(RMS_acc_y, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    calc_top5(RMS_acc_z, top5);
+    calc_top5_float(RMS_acc_z, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
     uart_write_bytes(UART_NUM, "\n", 1);
