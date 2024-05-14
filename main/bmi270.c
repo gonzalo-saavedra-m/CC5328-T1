@@ -811,7 +811,7 @@ int compare_desc(const void *a, const void *b) {
 }
 
 
-int compare_desc_float(const void *a, const void *b) {
+float compare_desc_float(const void *a, const void *b) {
     return (*(float *)b - *(float *)a);
 }
 
@@ -825,7 +825,7 @@ void calc_top5(int16_t* values, float* top5) {
 }
 
 void calc_top5_float(float* values, float* top5) {
-    qsort(values, DATA_LENGTH, sizeof(float), compare_desc);
+    qsort(values, DATA_LENGTH, sizeof(float), compare_desc_float);
     for (int i = 0; i < 5; i++) {
         top5[i] = values[i];
     }
