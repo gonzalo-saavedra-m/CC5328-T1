@@ -811,7 +811,7 @@ int compare_desc(const void *a, const void *b) {
 }
 
 //top5 sorts the values in descending order and stores the top 5 values in the top5 array
-void top5(int16_t* values, float* top5) {
+void calc_top5(int16_t* values, float* top5) {
     qsort(values, DATA_LENGTH, sizeof(int16_t), compare_desc);
     for (int i = 0; i < 5; i++) {
         top5[i] = (float)values[i];
@@ -1007,45 +1007,41 @@ void lectura(void) {
         }
     }
     // Calcular top5 data
-    top5(data.acc_x, top5);
+    calc_top5(data.acc_x, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(data.acc_y, top5);
+    calc_top5(data.acc_y, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(data.acc_z, top5);
-    dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));  
-
-    top5(data.gyr_x, top5);
+    calc_top5(data.acc_z, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(data.gyr_y, top5);
+    calc_top5(data.gyr_x, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(data.gyr_z, top5);
+    calc_top5(data.gyr_y, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    uart_write_bytes(UART_NUM, "\n", 1);
-
-    //Calcular top5 RMS
-    top5(RMS_acc_x, top5);
+    calc_top5(data.gyr_z, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(RMS_acc_y, top5);
+    calc_top5(RMS_acc_x, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
-    top5(RMS_acc_z, top5);
+    calc_top5(RMS_acc_y, top5);
     dataToSend = (const char*)top5;
     uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
+    calc_top5(RMS_acc_z, top5);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
     uart_write_bytes(UART_NUM, "\n", 1);
     uart_write_bytes(UART_NUM,"FINISHED_PEAKS\0",15);
 

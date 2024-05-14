@@ -17,9 +17,10 @@ FINISHED_PEAKS = b'FINISHED_PEAKS'
 SHUTDOWN = pack('9s', 'SHUTDOWN\0'.encode())
 
 class ReceiverController():
-    def __init__(self, port: str, baud_rate: int) -> None:
+    def __init__(self, port: str, baud_rate: int, data_size: int=100) -> None:
         self.ser = serial.Serial(port, baud_rate, timeout=5)
         self.reset_data() # Initialize the data dictionaries.
+        self.data_size = data_size
 
     def reset_data(self) -> None:
         self.acc = {
@@ -49,12 +50,15 @@ class ReceiverController():
                 'i': []},
         }
         self.peaks = {
+            'acc_x': [],
+            'acc_y': [],
+            'acc_z': [],
+            'gyr_x': [],
+            'gyr_y': [],
+            'gyr_z': [],
             'RMS.acc_x': [],
             'RMS.acc_y': [],
             'RMS.acc_z': [],
-            'acc_x': [],
-            'acc_y': [],
-            'acc_z': []
         }
 
     def in_waiting(self) -> bool:
@@ -78,7 +82,7 @@ class ReceiverController():
     def read_peaks(self, entry: bytes) -> None:
         try:
             data = unpack('6f', entry[:-1])
-            output_parser = ['RMS.acc_x', 'RMS.acc_y', 'RMS.acc_z', 'RMS.gyr_x', 'RMS.gyr_y', 'RMS.gyr_z', 'acc_x', 'acc_y', 'acc_z']
+            output_parser = ['RMS.acc_x', 'RMS.acc_y', 'RMS.acc_z', 'acc_x', 'acc_y', 'acc_z']
             output = output_parser[data[0]]
             self.peaks[output] = data[1:]
         except:
@@ -116,10 +120,10 @@ class ReceiverController():
                     byte_data.append(raw_data)
             byte_data = b''.join(byte_data)
             byte_data = byte_data[:-1]
-            data = unpack('300f', byte_data)
-            self.RMS['acc_x'] = data[:100]
-            self.RMS['acc_y'] = data[100:200]
-            self.RMS['acc_z'] = data[200:]
+            data = unpack(f'{self.data_size*3}f', byte_data)
+            self.RMS['acc_x'] = data[:self.data_size]
+            self.RMS['acc_y'] = data[self.data_size:2*self.data_size]
+            self.RMS['acc_z'] = data[2*self.data_size:]
             print('Sending BEGIN_FFT message...')
             self.write(BEGIN_FFT)
             byte_data = []
@@ -133,33 +137,47 @@ class ReceiverController():
                     byte_data.append(raw_data)
             byte_data = b''.join(byte_data)
             byte_data = byte_data[:-1] # Remove the last '\n' character
-            data = unpack('600f', byte_data)
-            self.FFT['acc_x']['r'] = data[:100]
-            self.FFT['acc_x']['i'] = data[100:200]
-            self.FFT['acc_y']['r'] = data[200:300]
-            self.FFT['acc_y']['i'] = data[300:400]
-            self.FFT['acc_z']['r'] = data[400:500]
-            self.FFT['acc_z']['i'] = data[500:]
+            data = unpack(f'{self.data_size*6}f', byte_data)
+            self.FFT['acc_x']['r'] = data[:self.data_size]
+            self.FFT['acc_x']['i'] = data[self.data_size:2*self.data_size]
+            self.FFT['acc_y']['r'] = data[2*self.data_size:3*self.data_size]
+            self.FFT['acc_y']['i'] = data[3*self.data_size:4*self.data_size]
+            self.FFT['acc_z']['r'] = data[4*self.data_size:5*self.data_size]
+            self.FFT['acc_z']['i'] = data[5*self.data_size:]
             print('Sending BEGIN_PEAKS message...')
             self.write(BEGIN_PEAKS)
+            byte_data = []
             while True:
                 if not self.in_waiting: continue
                 raw_data = self.ser.readline()
                 if FINISHED_PEAKS in raw_data:
                     print('Received FINISHED_PEAKS message.')
                     break
-                self.read_peaks(raw_data)
+                else:
+                    byte_data.append(raw_data)
+            byte_data = b''.join(byte_data)
+            byte_data = byte_data[:-1]
+            data = unpack('45f', byte_data)
+            self.peaks['acc_x'] = data[:5]
+            self.peaks['acc_y'] = data[5:10]
+            self.peaks['acc_z'] = data[10:15]
+            self.peaks['gyr_x'] = data[15:20]
+            self.peaks['gyr_y'] = data[20:25]
+            self.peaks['gyr_z'] = data[25:30]
+            self.peaks['RMS.acc_x'] = data[30:35]
+            self.peaks['RMS.acc_y'] = data[35:40]
+            self.peaks['RMS.acc_z'] = data[40:]
             print('Data acquisition process finished. Printing data...')
             print('Acceleration values:')
-            pprint(self.acc)
+            print(self.acc)
             print('Gyroscope values:')
-            pprint(self.gyr)
+            print(self.gyr)
             print('RMS values:')
-            pprint(self.RMS)
+            print(self.RMS)
             print('FFT values:')
-            pprint(self.FFT)
+            print(self.FFT)
             print('Peaks values:')
-            pprint(self.peaks)
+            print(self.peaks)
 
         except Exception as e:
             print(f'An error occurred: {e}')
@@ -173,5 +191,6 @@ class ReceiverController():
 if __name__ == '__main__':
     PORT = 'COM3'  # Esto depende del sistema operativo
     BAUD_RATE = 115200  # Debe coincidir con la configuracion de la ESP32
-    receiver = ReceiverController(PORT, BAUD_RATE)
+    data_size = sys.argv[1] if int(len(sys.argv)) > 1 else 100
+    receiver = ReceiverController(PORT, BAUD_RATE, data_size)
     receiver.main()
