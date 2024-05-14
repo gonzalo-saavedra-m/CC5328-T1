@@ -807,8 +807,14 @@ void calc_RMS(int16_t* values, float* results, size_t length) {
 }
 
 int compare_desc(const void *a, const void *b) {
+    return (*(int16_t *)b - *(int16_t *)a);
+}
+
+
+int compare_desc_float(const void *a, const void *b) {
     return (*(float *)b - *(float *)a);
 }
+
 
 //top5 sorts the values in descending order and stores the top 5 values in the top5 array
 void calc_top5(int16_t* values, float* top5) {

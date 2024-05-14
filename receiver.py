@@ -174,6 +174,7 @@ class ReceiverController():
             self.peaks['RMS.acc_y'] = data[35:40]
             self.peaks['RMS.acc_z'] = data[40:]
             print('Data acquisition process finished. Printing data...')
+
             # print('Acceleration values:')
             # print(self.acc)
             # print('Gyroscope values:')
@@ -182,6 +183,7 @@ class ReceiverController():
             # print(self.RMS)
             # print('FFT values:')
             # print(self.FFT)
+
             print('Peaks values:')
             pprint(self.peaks)
             print('acc_x:')
