@@ -905,12 +905,12 @@ void lectura(void) {
             gyr_y = (int16_t)((uint16_t)data_data8[9] << 8) | (uint16_t)data_data8[8];
             gyr_z = (int16_t)((uint16_t)data_data8[11] << 8) | (uint16_t)data_data8[10];
 
-            data.acc_x[i] = acc_x;
-            data.acc_y[i] = acc_y;
-            data.acc_z[i] = acc_z;
-            data.gyr_x[i] = gyr_x;
-            data.gyr_y[i] = gyr_y;
-            data.gyr_z[i] = gyr_z;
+            data.acc_x[i] = to_m_s2(acc_x);
+            data.acc_y[i] = to_m_s2(acc_y);
+            data.acc_z[i] = to_m_s2(acc_z);
+            data.gyr_x[i] = to_rad_s(gyr_x);
+            data.gyr_y[i] = to_rad_s(gyr_y);
+            data.gyr_z[i] = to_rad_s(gyr_z);
 
             if (ret != ESP_OK)
             {
@@ -919,7 +919,7 @@ void lectura(void) {
         }
     }
     for (int i = 0; i < DATA_LENGTH; i++) {
-        float rawDataToSend[6] = {to_m_s2(data.acc_x[i]), to_m_s2(data.acc_y[i]), to_m_s2(data.acc_z[i]), to_rad_s(data.gyr_x[i]), to_rad_s(data.gyr_y[i]), to_rad_s(data.gyr_z[i])};
+        float rawDataToSend[6] = {data.acc_x[i], data.acc_y[i], data.acc_z[i], data.gyr_x[i], data.gyr_y[i], data.gyr_z[i]};
         const char* dataToSend = (const char*)rawDataToSend;
         int len = sizeof(float) * 6;
         uart_write_bytes(UART_NUM, dataToSend, len);

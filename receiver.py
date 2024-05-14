@@ -16,6 +16,12 @@ BEGIN_PEAKS = pack('12s', 'BEGIN_PEAKS\0'.encode())
 FINISHED_PEAKS = b'FINISHED_PEAKS'
 SHUTDOWN = pack('9s', 'SHUTDOWN\0'.encode())
 
+def get_top_5(array: list) -> Tuple[float, float, float, float, float]:
+    copy = list(array)
+    copy.sort(reverse=True)
+    print('First 5:', copy[:5])
+    print('Last 5: ', copy[-5:])
+
 class ReceiverController():
     def __init__(self, port: str, baud_rate: int, data_size: int=100) -> None:
         self.ser = serial.Serial(port, baud_rate, timeout=5)
@@ -168,16 +174,34 @@ class ReceiverController():
             self.peaks['RMS.acc_y'] = data[35:40]
             self.peaks['RMS.acc_z'] = data[40:]
             print('Data acquisition process finished. Printing data...')
-            print('Acceleration values:')
-            print(self.acc)
-            print('Gyroscope values:')
-            print(self.gyr)
-            print('RMS values:')
-            print(self.RMS)
-            print('FFT values:')
-            print(self.FFT)
+            # print('Acceleration values:')
+            # print(self.acc)
+            # print('Gyroscope values:')
+            # print(self.gyr)
+            # print('RMS values:')
+            # print(self.RMS)
+            # print('FFT values:')
+            # print(self.FFT)
             print('Peaks values:')
-            print(self.peaks)
+            pprint(self.peaks)
+            print('acc_x:')
+            get_top_5(self.acc['x'])
+            print('acc_y:')
+            get_top_5(self.acc['y'])
+            print('acc_z:')
+            get_top_5(self.acc['z'])
+            print('gyr_x:')
+            get_top_5(self.gyr['x'])
+            print('gyr_y:')
+            get_top_5(self.gyr['y'])
+            print('gyr_z:')
+            get_top_5(self.gyr['z'])
+            print('RMS acc_x:')
+            get_top_5(self.RMS['acc_x'])
+            print('RMS acc_y:')
+            get_top_5(self.RMS['acc_y'])
+            print('RMS acc_z:')
+            get_top_5(self.RMS['acc_z'])
 
         except Exception as e:
             print(f'An error occurred: {e}')
