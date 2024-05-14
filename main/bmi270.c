@@ -1084,12 +1084,34 @@ void app_main(void)
     ESP_ERROR_CHECK(bmi_init());
     softreset();
     chipid();
-    initialization();
-    check_initialization();
-    performancemode();
     internal_status();
     uart_setup();
     while (1) {
+        initialization();
+        check_initialization();
+        char powermodeResponse[1];
+        uart_write_bytes(UART_NUM,"SELECT_POWER_MODE\0",18);
+        while(1) {
+            int rLen = serial_read(powermodeResponse, 1);
+            if (rLen > 0) {
+                if (strcmp(powermodeResponse, "L") == 0) {
+                    lowpowermode();
+                    break;
+                }
+                else if (strcmp(powermodeResponse, "N") == 0) {
+                    normalpowermode();
+                    break;
+                }
+                else if (strcmp(powermodeResponse, "P") == 0) {
+                    performancemode();
+                    break;
+                } else {
+                    // Default to normal power mode
+                    normalpowermode();
+                    break;
+                }
+            }
+        }
         uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
         char dataResponse1[15];
         while(1) {

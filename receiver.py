@@ -4,6 +4,10 @@ import sys
 from pprint import pprint
 
 # COMUNICATION CONSTANTS
+SELECT_POWER_MODE = b'SELECT_POWER_MODE'
+L = pack('1s', 'L'.encode())
+N = pack('1s', 'N'.encode())
+P = pack('1s', 'P'.encode())
 READY = b'READY_TO_START'
 BEGIN_READINGS = pack('15s', 'BEGIN_READINGS\0'.encode())
 STOP__READINGS = pack('15s', 'STOP__READINGS\0'.encode())
@@ -14,7 +18,6 @@ BEGIN_FFT = pack('10s', 'BEGIN_FFT\0'.encode())
 FINISHED_FFT = b'FINISHED_FFT'
 BEGIN_PEAKS = pack('12s', 'BEGIN_PEAKS\0'.encode())
 FINISHED_PEAKS = b'FINISHED_PEAKS'
-SHUTDOWN = pack('9s', 'SHUTDOWN\0'.encode())
 
 class ReceiverController():
     def __init__(self, port: str, baud_rate: int, data_size: int=100) -> None:
@@ -85,15 +88,37 @@ class ReceiverController():
                 if not self.in_waiting: continue
                 raw_data: bytes = self.ser.readline()
                 print(raw_data)
-                if READY in raw_data:
-                    print('Received READY message.')
-                    user_input = input('Press ENTER to start data acquisition or type "exit" to finish the program: ')
-                    if user_input == 'exit':
-                        break
-                    print('Sending BEGIN_READINGS message.')
-                    self.write(BEGIN_READINGS)
+                if SELECT_POWER_MODE in raw_data:
+                    print('Received SELECT_POWER_MODE message.')
+                    user_input = input('Select the power mode (L, N, P): ')
+                    if user_input == 'L':
+                        print('Sending L message.')
+                        self.write(L)
+                    elif user_input == 'N':
+                        print('Sending N message.')
+                        self.write(N)
+                    elif user_input == 'P':
+                        print('Sending P message.')
+                        self.write(P)
+                    else:
+                        print('Invalid power mode. Using N...')
+                        self.write(N)
                 else:
                     continue
+                while True:
+                    if not self.in_waiting: continue
+                    raw_data: bytes = self.ser.readline()
+                    print(raw_data)
+                    if READY in raw_data:
+                        print('Received READY message.')
+                        user_input = input('Press ENTER to start data acquisition or type "exit" to finish the program: ')
+                        if user_input == 'exit':
+                            raise StopIteration
+                        print('Sending BEGIN_READINGS message.')
+                        self.write(BEGIN_READINGS)
+                        break
+                    else:
+                        continue
                 while True:
                     if not self.in_waiting: continue
                     raw_data = self.ser.readline()
@@ -173,11 +198,13 @@ class ReceiverController():
                 print('Peaks values:')
                 pprint(self.peaks)
 
+        except StopIteration:
+            print('Exiting the program...')
         except Exception as e:
             print(f'An error occurred: {e}')
         finally:
             print('Sending SHUTDOWN message...')
-            self.write(SHUTDOWN)
+            self.write(STOP__READINGS)
             self.ser.close()
             print('Connection closed.')
 
