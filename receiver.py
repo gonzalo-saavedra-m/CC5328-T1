@@ -197,6 +197,18 @@ class ReceiverController():
                 print(self.FFT)
                 print('Peaks values:')
                 pprint(self.peaks)
+                with open('data.txt', 'a') as f:
+                    f.write('Acceleration values:\n')
+                    f.write(str(self.acc))
+                    f.write('\n\nGyroscope values:\n')
+                    f.write(str(self.gyr))
+                    f.write('\n\nRMS values:\n')
+                    f.write(str(self.RMS))
+                    f.write('\n\nFFT values:\n')
+                    f.write(str(self.FFT))
+                    f.write('\n\nPeaks values:\n')
+                    f.write(str(self.peaks))
+                    f.write('\n')
 
         except StopIteration:
             print('Exiting the program...')
