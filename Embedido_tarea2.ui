@@ -13,227 +13,7 @@
   <property name="windowTitle">
    <string>UI Sensores</string>
   </property>
-  <widget class="QLabel" name="label_30">
-   <property name="geometry">
-    <rect>
-     <x>350</x>
-     <y>130</y>
-     <width>101</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">color: rgb(0, 0, 0);
-
-</string>
-   </property>
-   <property name="text">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; text-decoration: underline;&quot;&gt;Sensor activo&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-   </property>
-  </widget>
-  <widget class="QProgressBar" name="progressBar">
-   <property name="geometry">
-    <rect>
-     <x>460</x>
-     <y>130</y>
-     <width>118</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="value">
-    <number>0</number>
-   </property>
-  </widget>
-  <widget class="QComboBox" name="selec_12">
-   <property name="geometry">
-    <rect>
-     <x>350</x>
-     <y>160</y>
-     <width>181</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">background-color: rgb(255, 255, 255);</string>
-   </property>
-   <item>
-    <property name="text">
-     <string>&lt;Ninguno&gt;</string>
-    </property>
-   </item>
-   <item>
-    <property name="text">
-     <string>BMI270</string>
-    </property>
-   </item>
-   <item>
-    <property name="text">
-     <string>BMI688</string>
-    </property>
-   </item>
-  </widget>
-  <widget class="QLabel" name="label_9">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>180</y>
-     <width>81</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Frecuencia de 
- muestro</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_7">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>130</y>
-     <width>81</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Sensibilidad</string>
-   </property>
-  </widget>
-  <widget class="QTextEdit" name="text_acc_sensibity">
-   <property name="geometry">
-    <rect>
-     <x>210</x>
-     <y>180</y>
-     <width>104</width>
-     <height>31</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QComboBox" name="selec_13">
-   <property name="geometry">
-    <rect>
-     <x>360</x>
-     <y>300</y>
-     <width>181</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">background-color: rgb(255, 255, 255);</string>
-   </property>
-   <item>
-    <property name="text">
-     <string>Paralelo</string>
-    </property>
-   </item>
-   <item>
-    <property name="text">
-     <string>Forzado</string>
-    </property>
-   </item>
-  </widget>
-  <widget class="QLabel" name="label_31">
-   <property name="geometry">
-    <rect>
-     <x>390</x>
-     <y>270</y>
-     <width>121</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">color: rgb(0, 0, 0);
-
-</string>
-   </property>
-   <property name="text">
-    <string>Modo de Funcionamiento</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_32">
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>100</y>
-     <width>121</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">color: rgb(0, 0, 0);
-
-</string>
-   </property>
-   <property name="text">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; text-decoration: underline;&quot;&gt;Acelerómetro&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_33">
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>220</y>
-     <width>121</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">color: rgb(0, 0, 0);
-
-</string>
-   </property>
-   <property name="text">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; text-decoration: underline;&quot;&gt;Giroscopio&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_8">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>250</y>
-     <width>81</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Sensibilidad</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_10">
-   <property name="geometry">
-    <rect>
-     <x>120</x>
-     <y>300</y>
-     <width>81</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Frecuencia de 
- muestro</string>
-   </property>
-  </widget>
-  <widget class="QTextEdit" name="text_acc_sensibity_2">
-   <property name="geometry">
-    <rect>
-     <x>210</x>
-     <y>300</y>
-     <width>104</width>
-     <height>31</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QTextEdit" name="text_acc_sampling_2">
-   <property name="geometry">
-    <rect>
-     <x>210</x>
-     <y>250</y>
-     <width>104</width>
-     <height>31</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QGraphicsView" name="Plot1">
+  <widget class="QGraphicsView" name="plot1">
    <property name="geometry">
     <rect>
      <x>60</x>
@@ -249,7 +29,7 @@
     <enum>QFrame::Plain</enum>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="Plot2">
+  <widget class="QGraphicsView" name="plot2">
    <property name="geometry">
     <rect>
      <x>390</x>
@@ -265,7 +45,7 @@
     <enum>QFrame::Plain</enum>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="Plot3">
+  <widget class="QGraphicsView" name="plot3">
    <property name="geometry">
     <rect>
      <x>60</x>
@@ -281,7 +61,7 @@
     <enum>QFrame::Plain</enum>
    </property>
   </widget>
-  <widget class="QGraphicsView" name="Plot4">
+  <widget class="QGraphicsView" name="plot4">
    <property name="geometry">
     <rect>
      <x>390</x>
@@ -297,7 +77,7 @@
     <enum>QFrame::Plain</enum>
    </property>
   </widget>
-  <widget class="QLabel" name="label_3">
+  <widget class="QLabel" name="label_data1">
    <property name="geometry">
     <rect>
      <x>120</x>
@@ -319,7 +99,7 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_4">
+  <widget class="QLabel" name="label_data2">
    <property name="geometry">
     <rect>
      <x>440</x>
@@ -341,7 +121,7 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_5">
+  <widget class="QLabel" name="label_data3">
    <property name="geometry">
     <rect>
      <x>120</x>
@@ -363,7 +143,7 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_6">
+  <widget class="QLabel" name="label_data4">
    <property name="geometry">
     <rect>
      <x>440</x>
@@ -385,57 +165,296 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QPushButton" name="pushButton">
+  <widget class="QPushButton" name="start_button">
    <property name="geometry">
     <rect>
-     <x>550</x>
-     <y>160</y>
-     <width>141</width>
-     <height>31</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Iniciar configuración</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pushButton_2">
-   <property name="geometry">
-    <rect>
-     <x>320</x>
-     <y>370</y>
-     <width>101</width>
+     <x>390</x>
+     <y>30</y>
+     <width>151</width>
      <height>41</height>
     </rect>
    </property>
    <property name="text">
-    <string>Iniciar captación 
- de datos</string>
+    <string>Iniciar captación de datos</string>
    </property>
   </widget>
-  <widget class="QComboBox" name="comboBox_acc_sampling">
+  <widget class="QWidget" name="verticalLayoutWidget">
    <property name="geometry">
     <rect>
-     <x>210</x>
-     <y>130</y>
-     <width>101</width>
-     <height>31</height>
+     <x>60</x>
+     <y>120</y>
+     <width>291</width>
+     <height>241</height>
     </rect>
    </property>
-   <item>
-    <property name="text">
-     <string>30</string>
-    </property>
-   </item>
-   <item>
-    <property name="text">
-     <string>120</string>
-    </property>
-   </item>
-   <item>
-    <property name="text">
-     <string>60</string>
-    </property>
-   </item>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>Modo de poder</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="bmi270_powermode">
+        <item>
+         <property name="text">
+          <string>Ahorro de energía</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Equilibrado</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Alto rendimiento</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Suspensión</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_5">
+      <item>
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Acelerómetro</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_9">
+          <item>
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>ODR</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="bmi270_acc_odr">
+            <item>
+             <property name="text">
+              <string>30</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>60</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_8">
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Sensibilidad</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="bmi270_acc_sens">
+            <item>
+             <property name="text">
+              <string>1</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>2</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_6">
+      <item>
+       <widget class="QLabel" name="label_8">
+        <property name="text">
+         <string>Giroscopio</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_10">
+          <item>
+           <widget class="QLabel" name="label_11">
+            <property name="text">
+             <string>ODR</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="bmi270_gyro_odr">
+            <item>
+             <property name="text">
+              <string>30</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>60</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_11">
+          <item>
+           <widget class="QLabel" name="label_12">
+            <property name="text">
+             <string>Sensibilidad</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="bmi270_gyro_sens">
+            <item>
+             <property name="text">
+              <string>1</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>2</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="verticalLayoutWidget_2">
+   <property name="geometry">
+    <rect>
+     <x>390</x>
+     <y>120</y>
+     <width>291</width>
+     <height>241</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_12">
+      <item>
+       <widget class="QLabel" name="label_14">
+        <property name="text">
+         <string>Modo de poder</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="bme688_powermode">
+        <item>
+         <property name="text">
+          <string>Forzado</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Paralelo</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Suspensión</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QLabel" name="label_7">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>100</y>
+     <width>121</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Configuración BMI270</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_13">
+   <property name="geometry">
+    <rect>
+     <x>480</x>
+     <y>100</y>
+     <width>111</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Configuración BME688</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="horizontalLayoutWidget_9">
+   <property name="geometry">
+    <rect>
+     <x>59</x>
+     <y>20</y>
+     <width>291</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout_13">
+    <item>
+     <widget class="QLabel" name="label_15">
+      <property name="text">
+       <string>Sensor</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="sensor_selector">
+      <item>
+       <property name="text">
+        <string>BMI270</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>BME688</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+   </layout>
   </widget>
  </widget>
  <resources/>
