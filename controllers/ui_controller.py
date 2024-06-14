@@ -1,5 +1,4 @@
 from ui_embebidos import Ui_Dialog
-from PyQt5 import QtWidgets
 
 class UI_Controller():
     def __init__(self, parent):
@@ -10,7 +9,6 @@ class UI_Controller():
         self.ui.start_button.clicked.connect(self.start)
 
     def start(self):
-        # Capture data from the UI
         print('Starting...')
         selected_sensor = self.ui.sensor_selector.currentText()
         print(f'Selected sensor: {selected_sensor}')
@@ -31,6 +29,7 @@ class UI_Controller():
 
 
 if __name__ == "__main__":
+    from PyQt5 import QtWidgets
     import sys
     app = app = QtWidgets.QApplication(sys.argv)
     dialog = QtWidgets.QDialog()
