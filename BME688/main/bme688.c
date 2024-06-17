@@ -717,6 +717,12 @@ void bmi_read_data(int acc_range, int gyr_range) {
 }
 
 // ------------ BME 688 ------------- //
+/* Heater temperature in degree Celsius */
+uint16_t temp_prof[3] = { 320, 100, 100 };
+
+/* Multiplier to the shared heater duration */
+uint16_t mul_prof[3] = { 5, 2, 10 };
+
 uint8_t calc_gas_wait(uint16_t dur) {
     // Fuente: BME688 API
     // https://github.com/boschsensortec/BME68x_SensorAPI/blob/master/bme68x.c#L1176
@@ -897,12 +903,12 @@ void bme_forced_mode(void) {
     do {
         ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
 
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK) { //si es que está seteado algun power mode
             // Se pone en sleep
-            pow_mode = (tmp_pow_mode & 0x03);
+            pow_mode = (tmp_pow_mode & 0x03); //mask 0b00000011 (mantiene los dos bits menos significativos)
             if (pow_mode != 0) {
-                tmp_pow_mode &= ~0x03;
-                ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
+                tmp_pow_mode &= ~0x03; //setea tmp_pow_mode en 0b00000000
+                ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1); //se escribe el sleep mode
             }
         }
     } while ((pow_mode != 0x0) && (ret == ESP_OK));
@@ -928,6 +934,185 @@ int bme_check_forced_mode(void) {
     ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp5, 1);
     vTaskDelay(task_delay_ms / portTICK_PERIOD_MS);
     return (tmp == 0b001 && tmp2 == 0x59 && tmp3 == 0x00 && tmp4 == 0b100000 && tmp5 == 0b01010101);
+}
+
+uint32_t bme68x_get_meas_dur(const uint8_t op_mode /*mode*/, struct bme68x_conf *conf /*osrs_t, osrs_p, osrs_h*/)
+{
+    uint32_t meas_dur = 0; /* Calculate in us */
+    uint32_t meas_cycles;
+    uint8_t os_to_meas_cycles[6] = { 0, 1, 2, 4, 8, 16 };
+
+    if (conf != NULL) //Si hay valores para osrs_t, osrs_p y osrs_h -> if(osrs_t != NULL && osrs_p != NULL && osrs_h != NULL)
+    {
+            meas_cycles = os_to_meas_cycles[conf->os_temp]; //osrs_t
+            meas_cycles += os_to_meas_cycles[conf->os_pres]; //osrs_p
+            meas_cycles += os_to_meas_cycles[conf->os_hum]; //osrs_h
+
+            /* TPH measurement duration */
+            meas_dur = meas_cycles * UINT32_C(1963);
+            meas_dur += UINT32_C(477 * 4); /* TPH switching duration */
+            meas_dur += UINT32_C(477 * 5); /* Gas measurement duration */
+    }
+
+    return meas_dur;
+}
+
+/*
+ * @brief This API is used to set the gas configuration of the sensor.
+ */
+void bme68x_set_heatr_conf(uint8_t op_mode /*mode*/, const struct bme68x_heatr_conf *conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/)
+{
+    uint8_t ctrl_gas_data[2];
+    uint8_t ctrl_gas_addr[2] = { BME68X_REG_CTRL_GAS_0, BME68X_REG_CTRL_GAS_1 /*0x71, ctrl_gas_1*/};
+
+    if (conf != NULL) /*heatr_temp_prof, heatr_dur_prof, profile_len != NULL*/
+    {
+        //se pone en modo sleep y luego configura el modo paralelo
+        rslt = bme68x_set_op_mode(BME68X_SLEEP_MODE, dev); 
+        
+        if (rslt == BME68X_OK)
+        {
+            //se configuran los valores de res_heat, gas_wait y gas_wait_shared
+            rslt = set_conf(conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/, op_mode /*mode*/); // LA DEFINIMOS MAS ABAJO
+        }
+    }
+}
+
+/* This internal API is used to set heater configurations */
+void set_conf(const struct bme68x_heatr_conf *conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/, uint8_t op_mode /*mode*/)
+{
+    uint8_t i;
+    uint8_t shared_dur;
+    uint8_t write_len = 0;
+    uint8_t gass_wait_shared = 0x6E;
+
+    //deberian ser 3 elementos para cada lista ya que profile_len = 3
+    uint8_t res_heat[3] = { 0, 0, 0 }; //res heat <9:0>
+    uint8_t rh_reg_data[3] = { 0, 0, 0 };
+    uint8_t gas_wait[3] = { 0, 0, 0 }; //gas wait <9:0>
+    uint8_t gw_reg_data[3] = { 0, 0, 0 };
+
+    for (i = 0; i < conf->profile_len; i++) //profile_len = 3
+    {//de los listados se usaran solo los primeros 3, al igual que las direcciones
+        rh_reg_addr[i] = 0x5A + i; // desde 0x5A hasta 0x63, 0x5A + i. 0x5A +1 = 0x5B; 0x5b + 1 = 0x5C; 0x5C + 1 = 0x5D
+        rh_reg_data[i] = calc_res_heat(conf->heatr_temp_prof[i] /*listado de 10 (3) temperaturas*/); //funcion definida en la plantilla
+        gw_reg_addr[i] = 0x64 + i; // desde 0x64 hasta 0x6D, 0x64 + i
+        gw_reg_data[i] = (uint8_t) conf->heatr_dur_prof[i]; //listado de 10 (3) multiplicadores
+    }
+
+    write_len = conf->profile_len; //write_len = 3
+    shared_dur = calc_heatr_dur_shared(conf->shared_heatr_dur); //SE DEFINE MAS ABAJO
+
+    bme68x_set_regs(&heater_dur_shared_addr, &shared_dur, 1, dev);
+        // bme_i2c_write(I2C_NUM_0, &gas_wait_shared, &shared_dur, 1);
+  
+    bme68x_set_regs(rh_reg_addr, rh_reg_data, write_len, dev);
+        // bme_i2c_write(I2C_NUM_0, &res_heat[0], &rh_reg_data[0], 1);
+        // bme_i2c_write(I2C_NUM_0, &res_heat[1], &rh_reg_data[1], 1);
+        // bme_i2c_write(I2C_NUM_0, &res_heat[2], &rh_reg_data[2], 1);
+ 
+
+    bme68x_set_regs(gw_reg_addr, gw_reg_data, write_len, dev);
+        // bme_i2c_write(I2C_NUM_0, &gas_wait[0], &gw_reg_data[0], 1);
+        // bme_i2c_write(I2C_NUM_0, &gas_wait[1], &gw_reg_data[1], 1);
+        // bme_i2c_write(I2C_NUM_0, &gas_wait[2], &gw_reg_data[2], 1);
+}
+
+/* This internal API is used to calculate the register value for
+ * shared heater duration */
+static uint8_t calc_heatr_dur_shared(uint16_t dur)
+{
+    uint8_t factor = 0;
+    uint8_t heatdurval;
+
+    if (dur >= 0x783)
+    {
+        heatdurval = 0xff; /* Max duration */
+    }
+    else
+    {
+        /* Step size of 0.477ms */
+        dur = (uint16_t)(((uint32_t)dur * 1000) / 477);
+        while (dur > 0x3F)
+        {
+            dur = dur >> 2;
+            factor += 1;
+        }
+
+        heatdurval = (uint8_t)(dur + (factor * 64));
+    }
+
+    return heatdurval;
+}
+
+int bme_parallel_mode(void){
+     // Datasheet[33]
+    uint8_t ctrl_hum = 0x72;    //x1 001 h
+    uint8_t ctrl_meas = 0x74;   //x2 010 t,p, mode
+    uint8_t gas_wait_shared = 0x6E;
+    uint8_t ctrl_gas_1 = 0x71;
+
+    uint8_t mask;
+    uint8_t prev;
+    // Configuramos el oversampling (Datasheet[36])
+
+    // 1. osrs_h esta en ctrl_hum (LSB) -> seteamos 001 en bits 2:0
+    uint8_t osrs_h = 0b001;
+    mask = 0b00000111;
+    bme_i2c_read(I2C_NUM_0, &ctrl_hum, &prev, 1);
+    osrs_h = (prev & ~mask) | osrs_h;
+
+    // 2. osrs_t esta en ctrl_meas MSB -> seteamos 010 en bits 7:5
+    uint8_t osrs_t = 0b01000000;
+    // 3. osrs_p esta en ctrl_meas LSB -> seteamos 101 en bits 4:2 [Datasheet:37]
+    uint8_t osrs_p = 0b00010100;
+    uint8_t osrs_t_p = osrs_t | osrs_p;
+    // Se recomienda escribir hum, temp y pres en un solo write
+
+    // 6. nb_conv esta en ctrl_gas_1 -> seteamos bits 3:0
+    uint8_t nb_conv = 0b00000011;   //step 0-2 (3)
+    // 7. run_gas esta en ctrl_gas_1 -> seteamos bit 5
+    uint8_t run_gas = 0b00100000;
+    uint8_t gas_conf = nb_conv | run_gas;
+
+    bme_i2c_write(I2C_NUM_0, &ctrl_hum, &osrs_h, 1);
+    bme_i2c_write(I2C_NUM_0, &ctrl_meas, &osrs_t_p, 1);
+    bme_i2c_write(I2C_NUM_0, &ctrl_gas_1, &gas_conf, 1);
+
+    // Seteamos el modo
+    // 8. Seteamos el modo a 10, pasando primero por sleep
+    uint8_t mode = 0b00000010; //parallel mode
+    uint8_t tmp_pow_mode;
+    uint8_t pow_mode = 0;
+
+    //se pone en sleep
+    do {
+        ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
+
+        if (ret == ESP_OK) { //si es que está seteado algun power mode
+            // Se pone en sleep
+            pow_mode = (tmp_pow_mode & 0x03); //mask 0b00000011 (mantiene los dos bits menos significativos)
+            if (pow_mode != 0) {
+                tmp_pow_mode &= ~0x03; //setea tmp_pow_mode en 0b00000000
+                ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1); //se escribe el sleep mode
+            }
+        }
+    } while ((pow_mode != 0x0) && (ret == ESP_OK));
+
+    //gas_wait_shared, gas_wait_x, res_wait_x
+
+    /* Shared heating duration in milliseconds */
+    uint16_t shared_heatr_dur = (uint16_t)(140 - (bme68x_get_meas_dur(mode /*0b00000010*/, &conf /*osrs_t, osrs_p, osrs_h*/) / 1000));
+    uint8_t profile_len = 3;
+    uint16_t *heatr_dur_prof = mul_prof;
+    uint16_t *heatr_temp_prof = temp_prof;
+
+    //set the gas configuration to the sensor
+    bme68x_set_heatr_conf(mode /*0b00000010*/, &heatr_conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/);
+
+    tmp_pow_mode = (tmp_pow_mode & ~0x03) | mode;
+    ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 int bme_temp_celsius(uint32_t temp_adc) {
@@ -986,6 +1171,13 @@ void bme_read_data(void) {
     uint8_t tmp;
 
     // Se obtienen los datos de temperatura
+
+    // para parallel se usan los fields de 0 a 2
+    //field 0 -> {0x22, 0x23, 0x24}
+    //field 1 -> {0x33, 0x34, 0x35}
+    //field 2 -> {0x44, 0x45, 0x46}
+    
+    // para forced se usan solo los field 0
     uint8_t forced_temp_addr[] = {0x22, 0x23, 0x24};
     for (;;) {
         uint32_t temp_adc = 0;
