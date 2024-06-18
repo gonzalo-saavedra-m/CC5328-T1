@@ -1163,7 +1163,7 @@ int bme_parallel_mode(void){
     vTaskDelay(pdMS_TO_TICKS(50));
 }
 
-int bme_temp_celsius(uint32_t temp_adc) {
+int bme_temp_celsius(uint32_t temp_adc, int *t_fine) {
     // Datasheet[23]
     // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=23
 
@@ -1189,7 +1189,6 @@ int bme_temp_celsius(uint32_t temp_adc) {
     int64_t var1;
     int64_t var2;
     int64_t var3;
-    int t_fine;
     int calc_temp;
 
     var1 = ((int32_t)temp_adc >> 3) - ((int32_t)par_t1 << 1);
@@ -1199,6 +1198,141 @@ int bme_temp_celsius(uint32_t temp_adc) {
     t_fine = (int32_t)(var2 + var3);
     calc_temp = (((t_fine * 5) + 128) >> 8);
     return calc_temp;
+}
+
+int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
+    uint8_t addr_par_p1_lsb = 0x8E, addr_par_p1_msb = 0x8F;
+    uint8_t addr_par_p2_lsb = 0x90, addr_par_p2_msb = 0x91;
+    uint8_t addr_par_p3_lsb = 0x92;
+    uint8_t addr_par_p4_lsb = 0x94, addr_par_p4_msb = 0x95;
+    uint8_t addr_par_p5_lsb = 0x96, addr_par_p5_msb = 0x97;
+    uint8_t addr_par_p6_lsb = 0x99;
+    uint8_t addr_par_p7_lsb = 0x98;
+    uint8_t addr_par_p8_lsb = 0x9C, addr_par_p8_msb = 0x9D;
+    uint8_t addr_par_p9_lsb = 0x9E, addr_par_p9_msb = 0x9F;
+    uint8_t addr_par_p10_lsb = 0xA0;
+    uint16_t par_p1;
+    uint16_t par_p2;
+    uint16_t par_p3;
+    uint16_t par_p4;
+    uint16_t par_p5;
+    uint16_t par_p6;
+    uint16_t par_p7;
+    uint16_t par_p8;
+    uint16_t par_p9;
+    uint16_t par_p10;
+
+    uint8_t par[16];
+    bme_i2c_read(I2C_NUM_0, &addr_par_p1_lsb, par, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p1_msb, par + 1, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p2_lsb, par + 2, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p2_msb, par + 3, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p3_lsb, par + 4, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p4_lsb, par + 5, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p4_msb, par + 6, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p5_lsb, par + 7, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p5_msb, par + 8, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p6_lsb, par + 9, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p7_lsb, par + 10, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p8_lsb, par + 11, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p8_msb, par + 12, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p9_lsb, par + 13, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p9_msb, par + 14, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_p10_lsb, par + 15, 1);
+
+    par_p1 = (par[1] << 8) | par[0];
+    par_p2 = (par[3] << 8) | par[2];   
+    par_p3 = par[4];
+    par_p4 = (par[6] << 8) | par[5];
+    par_p5 = (par[8] << 8) | par[7];
+    par_p6 = par[9];
+    par_p7 = par[10];
+    par_p8 = (par[12] << 8) | par[11];
+    par_p9 = (par[14] << 8) | par[13];
+    par_p10 = par[15]; 
+
+    int64_t var1;
+    int64_t var2;
+    int64_t var3;
+    int calc_press;
+
+    var1 = ((int32_t)t_fine >> 1) - 64000;
+    var2 = ((((var1 >> 2) * (var1 >> 2)) >> 11) * (int32_t)par_p6) >> 2;
+    var2 = var2 + ((var1 * (int31_t)par_p5) << 1);
+    var2 = (var2 >> 2) + ((int32_t)par_p4 << 16);
+    var1 = (((((var1 >> 2) * (var1 >> 2)) >> 13) * ((int32_t)par_p3 << 5)) >> 3) + (((int32_t)par_p2 * var1) >> 1);
+    var1 = var1 >> 18;
+    var1 = ((32768 + var1) * (int32_t)par_p1) >> 15;
+    calc_press = 1048576 - pres_adc;
+    calc_press = (uint32_t)((calc_press - (var2 >> 12)) * ((uint32_t)3125));
+    if(calc_press >= (1 << 30)){
+        calc_press = ((calc_press / (uint32_t)var1) << 1);
+    } else {
+        calc_press = ((calc_press << 1) / (uint32_t)var1);
+    }
+    var1 = ((int32_t)par_p9 * (int32_t)(((calc_press >> 3) * (calc_press >> 3)) >> 13)) >> 12;
+    var2 = ((int32_t)(calc_press >> 2) * (int32_t)par_p8) >> 13;
+    var3 = ((int32_t)(calc_press >> 8) * (int32_t)(calc_press >> 8) * (int32_t)(calc_press >> 8) * (int32_t)par_p10) >> 17;
+    calc_press = (int32_t)(calc_press) +  ((var1 + var2 + var3 + ((int32_t)par_p7 << 7)) >> 4);
+
+    return calc_press;
+}
+
+int bme_hum_percent(uint32_t hum_adc, int *t_fine, uint32_t temp_comp) {
+    uint8_t addr_par_h1_lsb = 0xE2 /*<3:0>*/, addr_par_h1_msb = 0xE3;
+    uint8_t addr_par_h2_lsb = 0xE2 /*<7:4>*/, addr_par_h2_msb = 0xE1;
+    uint8_t addr_par_h3_lsb = 0xE4;
+    uint8_t addr_par_h4_lsb = 0xE5;
+    uint8_t addr_par_h5_lsb = 0xE6;
+    uint8_t addr_par_h6_lsb = 0xE7;
+    uint8_t addr_par_h7_lsb = 0xE8;
+    uint16_t par_h1;
+    uint16_t par_h2;
+    uint16_t par_h3;
+    uint16_t par_h4;
+    uint16_t par_h5;
+    uint16_t par_h6;
+    uint16_t par_h7;
+
+    uint8_t par[9];
+    //h1 y h2 se escriben en la misma direccion, pero en bits diferentes, h1 en <3:0> y h2 en <7:4>
+
+    bme_i2c_read(I2C_NUM_0, &addr_par_h1_lsb, par, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h1_msb, par + 1, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h2_lsb, par + 2, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h2_msb, par + 3, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h3_lsb, par + 4, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h4_lsb, par + 5, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h5_lsb, par + 6, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h6_lsb, par + 7, 1);
+    bme_i2c_read(I2C_NUM_0, &addr_par_h7_lsb, par + 8, 1);
+
+    par_h1 = (par[1] << 4) | (par[0] & 0x0F); //mask 0b00001111
+    par_h2 = (par[3] << 4) | (par[2] & 0xF0); //mask 0b11110000
+    par_h3 = par[4];
+    par_h4 = par[5];
+    par_h5 = par[6];
+    par_h6 = par[7];
+    par_h7 = par[8];
+
+    int64_t var1;
+    int64_t var2;
+    int64_t var3;
+    int64_t var4;
+    int64_t var5;
+    int64_t var6;
+    int64_t calc_hum;
+
+    var1 = (int32_t)hum_adc - (int32_t)((int32_t)par_h1 << 4) - (((temp_comp * (int32_t)par_h3) / ((int32_t)100)) >> 1);
+    var2 = ((int32_t)par_h2 * (((temp_comp * (int32_t)par_h4) / ((int32_t)100)) + (((temp_comp * ((temp_comp * (int32_t)par_h5) / ((int32_t)100))) >> 6) / ((int32_t)100)) + ((int32_t)(1 << 14)))) >> 10;
+    var3 = var1 * var2;
+    var4 = (((int32_t)par_h6 << 7) + ((temp_comp * (int32_t)par_h7) / ((int32_t)100))) >> 4;
+    var5 = ((var3 >> 14) * (var3 >> 14)) >> 10;
+    var6 = (var4 * var5) >> 1;
+    calc_hum = (var3 + var6) >> 12;
+    calc_hum = (((var3 + var6) >> 10) * ((int32_t)1000)) >> 12;
+
+    return calc_hum;
 }
 
 uint8_t bme_get_mode(void) {
@@ -1242,6 +1376,10 @@ void bme_read_data(void) {
     uint32_t p_pres_adc[3] = {0, 0, 0};
     uint32_t p_hum_adc[3] = {0, 0, 0};
     uint32_t temp_parallel[3] = {0, 0, 0};
+    uint32_t pres_parallel[3] = {0, 0, 0};
+    uint32_t hum_parallel[3] = {0, 0, 0};
+
+    int t_fine;
 
     //if mode is forced
     if(cur_mode == 1){
@@ -1257,7 +1395,7 @@ void bme_read_data(void) {
         bme_i2c_read(I2C_NUM_0, &forced_temp_addr[2], &tmp, 1);
         temp_adc = temp_adc | (tmp & 0xf0) >> 4;
 
-        uint32_t temp = bme_temp_celsius(temp_adc);
+        uint32_t f_temp = bme_temp_celsius(temp_adc, &t_fine);
         printf("Temperatura: %f\n", (float)temp / 100);
 
         bme_i2c_read(I2C_NUM_0, &forced_pres_addr[0], &tmp, 1);
@@ -1267,14 +1405,17 @@ void bme_read_data(void) {
         bme_i2c_read(I2C_NUM_0, &forced_pres_addr[2], &tmp, 1);
         pres_adc = pres_adc | (tmp & 0xf0) >> 4;
 
-        printf("Presion: %f\n ajustable", (float)pres_adc);
+        uint32_t f_pres = bme_pressure_pascal(pres_adc, &t_fine);
+        printf("Presion: %f\n ajustable", (float)f_pres);
 
         bme_i2c_read(I2C_NUM_0, &forced_hum_addr[0], &tmp, 1);
         hum_adc = hum_adc | tmp << 8;
         bme_i2c_read(I2C_NUM_0, &forced_hum_addr[1], &tmp, 1);
         hum_adc = hum_adc | tmp;
 
-        printf("Humedad: %f\n ajustable", (float)hum_adc);
+
+        uint32_t f_hum = bme_hum_percent(hum_adc, &t_fine, f_temp);
+        printf("Humedad: %f\n ajustable", (float)f_hum);
         }
     }
     //if mode is parallel
@@ -1291,7 +1432,7 @@ void bme_read_data(void) {
                 bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1);
                 p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
 
-                temp_parallel[i] = bme_temp_celsius(p_temp_adc[i]);
+                temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
                 printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
 
                 bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1);
@@ -1301,19 +1442,19 @@ void bme_read_data(void) {
                 bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1);
                 p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
 
-                printf("Presion: %f\n ajustable", (float)p_pres_adc[i]);
+                pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
+                printf("Presion: %f\n ajustable", (float)pres_parallel[i]);
 
                 bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1);
                 p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
                 bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1);
                 p_hum_adc[i] = p_hum_adc[i] | tmp;
 
+                hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
                 printf("Humedad: %f\n ajustable", (float)p_hum_adc[i]);
             }
         }
     }
-    
-    
 }
 
 void app_main(void) {
