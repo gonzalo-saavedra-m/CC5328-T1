@@ -1201,7 +1201,7 @@ int bme_temp_celsius(uint32_t temp_adc) {
     return calc_temp;
 }
 
-void bme_get_mode(void) {
+uint8_t bme_get_mode(void) {
     uint8_t reg_mode = 0x74;
     uint8_t tmp;
 
@@ -1210,6 +1210,7 @@ void bme_get_mode(void) {
     tmp = tmp & 0x3;
 
     printf("Valor de BME MODE: %2X \n\n", tmp);
+    return tmp;
 }
 
 void bme_read_data(void) {
@@ -1224,11 +1225,27 @@ void bme_read_data(void) {
     //field 0 -> {0x22, 0x23, 0x24}
     //field 1 -> {0x33, 0x34, 0x35}
     //field 2 -> {0x44, 0x45, 0x46}
-    
+    uint8_t parallel_temp_addr[3][3] = {{0x22, 0x23, 0x24}, {0x33, 0x34, 0x35}, {0x44, 0x45, 0x46}};
+    uint8_t parallel_pres_addr[3][3] = {{0x1F, 0x20, 0x21}, {0x30, 0x31, 0x32}, {0x41, 0x42, 0x43}};
+    uint8_t parallel_hum_addr[3][3] = {{0x25, 0x26}, {0x36, 0x37}, {0x47, 0x48}};
     // para forced se usan solo los field 0
     uint8_t forced_temp_addr[] = {0x22, 0x23, 0x24};
-    for (;;) {
-        uint32_t temp_adc = 0;
+    uint8_t forced_pres_addr[] = {0x1F, 0x20, 0x21};
+    uint8_t forced_hum_addr[] = {0x25, 0x26, 0x27};
+
+    uint8_t cur_mode = bme_get_mode();
+    uint32_t f_temp_adc = 0;
+    uint32_t f_pres_adc = 0;
+    uint32_t f_hum_adc = 0;
+
+    uint32_t p_temp_adc[3] = {0, 0, 0};
+    uint32_t p_pres_adc[3] = {0, 0, 0};
+    uint32_t p_hum_adc[3] = {0, 0, 0};
+    uint32_t temp_parallel[3] = {0, 0, 0};
+
+    //if mode is forced
+    if(cur_mode == 1){
+        for (;;) {
         bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
@@ -1242,7 +1259,61 @@ void bme_read_data(void) {
 
         uint32_t temp = bme_temp_celsius(temp_adc);
         printf("Temperatura: %f\n", (float)temp / 100);
+
+        bme_i2c_read(I2C_NUM_0, &forced_pres_addr[0], &tmp, 1);
+        pres_adc = pres_adc | tmp << 12;
+        bme_i2c_read(I2C_NUM_0, &forced_pres_addr[1], &tmp, 1);
+        pres_adc = pres_adc | tmp << 4;
+        bme_i2c_read(I2C_NUM_0, &forced_pres_addr[2], &tmp, 1);
+        pres_adc = pres_adc | (tmp & 0xf0) >> 4;
+
+        printf("Presion: %f\n ajustable", (float)pres_adc);
+
+        bme_i2c_read(I2C_NUM_0, &forced_hum_addr[0], &tmp, 1);
+        hum_adc = hum_adc | tmp << 8;
+        bme_i2c_read(I2C_NUM_0, &forced_hum_addr[1], &tmp, 1);
+        hum_adc = hum_adc | tmp;
+
+        printf("Humedad: %f\n ajustable", (float)hum_adc);
+        }
     }
+    //if mode is parallel
+    else if (cur_mode == 2)
+    {
+        for(;;){
+            bme_parallel_mode();
+
+            for(int i = 0; i < 3; i++){
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1);
+                p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1);
+                p_temp_adc[i] = p_temp_adc[i] | tmp << 4;
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1);
+                p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
+
+                temp_parallel[i] = bme_temp_celsius(p_temp_adc[i]);
+                printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
+
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1);
+                p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1);
+                p_pres_adc[i] = p_pres_adc[i] | tmp << 4;
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1);
+                p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
+
+                printf("Presion: %f\n ajustable", (float)p_pres_adc[i]);
+
+                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1);
+                p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
+                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1);
+                p_hum_adc[i] = p_hum_adc[i] | tmp;
+
+                printf("Humedad: %f\n ajustable", (float)p_hum_adc[i]);
+            }
+        }
+    }
+    
+    
 }
 
 void app_main(void) {
