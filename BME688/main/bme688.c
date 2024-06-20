@@ -39,7 +39,17 @@ esp_err_t ret2 = ESP_OK;
 
 uint16_t val0[6];
 
+// consts
+uint8_t res_heat_0 = 0x5A;
+uint8_t gas_wait_0 = 0x64;
+uint8_t gas_wait_shared = 0x6E;
+uint8_t ctrl_gas_1 = 0x71;
+uint8_t ctrl_hum = 0x72;
+uint8_t ctrl_meas = 0x74;
+
 float task_delay_ms = 1000;
+
+
 
 esp_err_t sensor_init(void) {
     int i2c_master_port = I2C_NUM_0;
@@ -889,12 +899,6 @@ void bme_forced_mode(void) {
     */
 
     // Datasheet[33]
-    uint8_t ctrl_hum = 0x72;
-    uint8_t ctrl_meas = 0x74;
-    uint8_t gas_wait_0 = 0x64;
-    uint8_t res_heat_0 = 0x5A;
-    uint8_t ctrl_gas_1 = 0x71;
-
     uint8_t mask;
     uint8_t prev;
     // Configuramos el oversampling (Datasheet[36])
@@ -957,14 +961,7 @@ void bme_forced_mode(void) {
 }
 
 int bme_check_forced_mode(void) {
-    uint8_t ctrl_hum = 0x72;
-    uint8_t ctrl_meas = 0x74;
-    uint8_t gas_wait_0 = 0x64;
-    uint8_t res_heat_0 = 0x5A;
-    uint8_t ctrl_gas_1 = 0x71;
-
     uint8_t tmp, tmp2, tmp3, tmp4, tmp5;
-
     ret = bme_i2c_read(I2C_NUM_0, &ctrl_hum, &tmp, 1);
     ret = bme_i2c_read(I2C_NUM_0, &gas_wait_0, &tmp2, 1);
     ret = bme_i2c_read(I2C_NUM_0, &res_heat_0, &tmp3, 1);
@@ -995,71 +992,6 @@ uint32_t bme68x_get_meas_dur(const uint8_t op_mode, struct bme68x_conf *conf /*o
     return meas_dur;
 }
 
-/*
- * @brief This API is used to set the gas configuration of the sensor.
- */
-void bme68x_set_heatr_conf(uint8_t op_mode /*mode*/, const struct bme68x_heatr_conf *conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/)
-{
-    if (conf != NULL) /*heatr_temp_prof, heatr_dur_prof, profile_len != NULL*/
-    {
-        //se pone en modo sleep y luego configura el modo paralelo
-        do {
-            ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
-
-            if (ret == ESP_OK) { //si es que está seteado algun power mode
-                // Se pone en sleep
-                pow_mode = (tmp_pow_mode & 0x03); //mask 0b00000011 (mantiene los dos bits menos significativos)
-                if (pow_mode != 0) {
-                    tmp_pow_mode &= ~0x03; //setea tmp_pow_mode en 0b00000000
-                    ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1); //se escribe el sleep mode
-                }
-            }
-        } while ((pow_mode != 0x0) && (ret == ESP_OK));
-        
-        //se configuran los valores de res_heat, gas_wait y gas_wait_shared
-        set_conf(conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/, op_mode /*mode*/); // LA DEFINIMOS MAS ABAJO
-
-    }
-}
-
-/* This internal API is used to set heater configurations */
-void set_conf(const struct bme68x_heatr_conf *conf /*heatr_temp_prof, heatr_dur_prof, profile_len, shared_heatr_dur*/, uint8_t op_mode /*mode*/)
-{
-    uint8_t i;
-    uint8_t shared_dur;
-    uint8_t gass_wait_shared = 0x6E;
-
-    //deberian ser 3 elementos para cada lista ya que profile_len = 3
-    uint8_t res_heat[3] = { 0, 0, 0 }; //res heat <9:0>
-    uint8_t rh_reg_data[3] = { 0, 0, 0 };
-    uint8_t gas_wait[3] = { 0, 0, 0 }; //gas wait <9:0>
-    uint8_t gw_reg_data[3] = { 0, 0, 0 };
-
-    for (i = 0; i < conf->profile_len; i++) //profile_len = 3
-    {//de los listados se usaran solo los primeros 3, al igual que las direcciones
-        res_heat[i] = 0x5A + i; // desde 0x5A hasta 0x63, 0x5A + i. 0x5A +1 = 0x5B; 0x5b + 1 = 0x5C; 0x5C + 1 = 0x5D
-        rh_reg_data[i] = calc_res_heat(conf->heatr_temp_prof[i] /*listado de 10 (3) temperaturas*/); //funcion definida en la plantilla
-        gas_wait[i] = 0x64 + i; // desde 0x64 hasta 0x6D, 0x64 + i
-        gw_reg_data[i] = (uint8_t) conf->heatr_dur_prof[i]; //listado de 10 (3) multiplicadores
-    }
-
-    write_len = conf->profile_len; //write_len = 3
-    shared_dur = calc_heatr_dur_shared(conf->shared_heatr_dur); //SE DEFINE MAS ABAJO
-
-    // gas wait shared
-    bme_i2c_write(I2C_NUM_0, &gas_wait_shared, &shared_dur, 1);
-  
-    // res heat
-    bme_i2c_write(I2C_NUM_0, &res_heat[0], &rh_reg_data[0], 1);
-    bme_i2c_write(I2C_NUM_0, &res_heat[1], &rh_reg_data[1], 1);
-    bme_i2c_write(I2C_NUM_0, &res_heat[2], &rh_reg_data[2], 1);
- 
-    // gas wait
-    bme_i2c_write(I2C_NUM_0, &gas_wait[0], &gw_reg_data[0], 1);
-    bme_i2c_write(I2C_NUM_0, &gas_wait[1], &gw_reg_data[1], 1);
-    bme_i2c_write(I2C_NUM_0, &gas_wait[2], &gw_reg_data[2], 1);
-}
-
 /* This internal API is used to calculate the register value for
  * shared heater duration */
 static uint8_t calc_heatr_dur_shared(uint16_t dur)
@@ -1087,12 +1019,74 @@ static uint8_t calc_heatr_dur_shared(uint16_t dur)
     return heatdurval;
 }
 
-int bme_parallel_mode(void){
+/* This internal API is used to set heater configurations */
+void set_conf(const struct bme68x_heatr_conf *conf, uint8_t op_mode)
+{
+    uint8_t i;
+    uint8_t shared_dur;
+    uint8_t gass_wait_shared = 0x6E;
+
+    //deberian ser 3 elementos para cada lista ya que profile_len = 3
+    uint8_t res_heat[3] = { 0, 0, 0 }; //res heat <9:0>
+    uint8_t rh_reg_data[3] = { 0, 0, 0 };
+    uint8_t gas_wait[3] = { 0, 0, 0 }; //gas wait <9:0>
+    uint8_t gw_reg_data[3] = { 0, 0, 0 };
+
+    for (i = 0; i < conf->profile_len; i++) //profile_len = 3
+    {//de los listados se usaran solo los primeros 3, al igual que las direcciones
+        res_heat[i] = 0x5A + i; // desde 0x5A hasta 0x63, 0x5A + i. 0x5A +1 = 0x5B; 0x5b + 1 = 0x5C; 0x5C + 1 = 0x5D
+        rh_reg_data[i] = calc_res_heat(conf->heatr_temp_prof[i] /*listado de 10 (3) temperaturas*/); //funcion definida en la plantilla
+        gas_wait[i] = 0x64 + i; // desde 0x64 hasta 0x6D, 0x64 + i
+        gw_reg_data[i] = (uint8_t) conf->heatr_dur_prof[i]; //listado de 10 (3) multiplicadores
+    }
+
+    shared_dur = calc_heatr_dur_shared(conf->shared_heatr_dur); //SE DEFINE MAS ABAJO
+    // gas wait shared
+    bme_i2c_write(I2C_NUM_0, &gas_wait_shared, &shared_dur, 1);
+
+    // res heat
+    bme_i2c_write(I2C_NUM_0, &res_heat[0], &rh_reg_data[0], 1);
+    bme_i2c_write(I2C_NUM_0, &res_heat[1], &rh_reg_data[1], 1);
+    bme_i2c_write(I2C_NUM_0, &res_heat[2], &rh_reg_data[2], 1);
+
+    // gas wait
+    bme_i2c_write(I2C_NUM_0, &gas_wait[0], &gw_reg_data[0], 1);
+    bme_i2c_write(I2C_NUM_0, &gas_wait[1], &gw_reg_data[1], 1);
+    bme_i2c_write(I2C_NUM_0, &gas_wait[2], &gw_reg_data[2], 1);
+}
+
+/*
+ * @brief This API is used to set the gas configuration of the sensor.
+ */
+void bme68x_set_heatr_conf(
+    uint8_t op_mode,
+    const struct bme68x_heatr_conf *conf) {
+    uint8_t tmp_pow_mode;
+    uint8_t pow_mode = 0;
+    if (conf != NULL) /*heatr_temp_prof, heatr_dur_prof, profile_len != NULL*/
+    {
+        //se pone en modo sleep y luego configura el modo paralelo
+        do {
+            ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
+
+            if (ret == ESP_OK) { //si es que está seteado algun power mode
+                // Se pone en sleep
+                pow_mode = (tmp_pow_mode & 0x03); //mask 0b00000011 (mantiene los dos bits menos significativos)
+                if (pow_mode != 0) {
+                    tmp_pow_mode &= ~0x03; //setea tmp_pow_mode en 0b00000000
+                    ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1); //se escribe el sleep mode
+                }
+            }
+        } while ((pow_mode != 0x0) && (ret == ESP_OK));
+
+        //se configuran los valores de res_heat, gas_wait y gas_wait_shared
+        set_conf(conf, op_mode); // LA DEFINIMOS MAS ABAJO
+    }
+}
+
+void bme_parallel_mode(void){
      // Datasheet[33]
-    uint8_t ctrl_hum = 0x72;    //x1 001 h
-    uint8_t ctrl_meas = 0x74;   //x2 010 t,p, mode
     uint8_t gas_wait_shared = 0x6E;
-    uint8_t ctrl_gas_1 = 0x71;
 
     struct bme68x_heatr_conf heatr_conf;
     struct bme68x_conf conf;
@@ -1195,8 +1189,8 @@ int bme_temp_celsius(uint32_t temp_adc, int *t_fine) {
     var2 = (var1 * (int32_t)par_t2) >> 11;
     var3 = ((var1 >> 1) * (var1 >> 1)) >> 12;
     var3 = ((var3) * ((int32_t)par_t3 << 4)) >> 14;
-    t_fine = (int32_t)(var2 + var3);
-    calc_temp = (((t_fine * 5) + 128) >> 8);
+    *t_fine = (int32_t)(var2 + var3);
+    calc_temp = (((*t_fine * 5) + 128) >> 8);
     return calc_temp;
 }
 
@@ -1241,7 +1235,7 @@ int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
     bme_i2c_read(I2C_NUM_0, &addr_par_p10_lsb, par + 15, 1);
 
     par_p1 = (par[1] << 8) | par[0];
-    par_p2 = (par[3] << 8) | par[2];   
+    par_p2 = (par[3] << 8) | par[2];
     par_p3 = par[4];
     par_p4 = (par[6] << 8) | par[5];
     par_p5 = (par[8] << 8) | par[7];
@@ -1249,7 +1243,7 @@ int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
     par_p7 = par[10];
     par_p8 = (par[12] << 8) | par[11];
     par_p9 = (par[14] << 8) | par[13];
-    par_p10 = par[15]; 
+    par_p10 = par[15];
 
     int64_t var1;
     int64_t var2;
@@ -1258,7 +1252,7 @@ int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
 
     var1 = ((int32_t)t_fine >> 1) - 64000;
     var2 = ((((var1 >> 2) * (var1 >> 2)) >> 11) * (int32_t)par_p6) >> 2;
-    var2 = var2 + ((var1 * (int31_t)par_p5) << 1);
+    var2 = var2 + ((var1 * (int32_t)par_p5) << 1);
     var2 = (var2 >> 2) + ((int32_t)par_p4 << 16);
     var1 = (((((var1 >> 2) * (var1 >> 2)) >> 13) * ((int32_t)par_p3 << 5)) >> 3) + (((int32_t)par_p2 * var1) >> 1);
     var1 = var1 >> 18;
@@ -1340,10 +1334,8 @@ int bme_gas_resistance(uint32_t gas_adc, uint32_t gas_range) {
     int32_t var2 = (int32_t) gas_adc - INT32_C(512);
     var2 *= INT32_C(3);
     var2 = INT32_C(4096) + var2;
-    calc_gas_res = (UINT32_C(10000) * var1) / (uint32_t)var2;
-    gas_res = calc_gas_res * 100;
-
-    return gas_res;
+    int calc_gas_res = (UINT32_C(10000) * var1) / (uint32_t)var2;
+    return calc_gas_res * 100;
 }
 
 uint8_t bme_get_mode(void) {
@@ -1407,7 +1399,6 @@ void bme_read_data(void) {
 
     //if mode is forced
     if(cur_mode == 1){
-        for (;;) {
         bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
@@ -1420,7 +1411,7 @@ void bme_read_data(void) {
         f_temp_adc = f_temp_adc | (tmp & 0xf0) >> 4;
 
         uint32_t f_temp = bme_temp_celsius(f_temp_adc, &t_fine);
-        printf("Temperatura: %f\n", (float)temp / 100);
+        printf("Temperatura: %f\n", (float)f_temp / 100);
 
         bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][0], &tmp, 1);
         f_pres_adc = f_pres_adc | tmp << 12;
@@ -1430,7 +1421,7 @@ void bme_read_data(void) {
         f_pres_adc = f_pres_adc | (tmp & 0xf0) >> 4;
 
         uint32_t f_pres = bme_pressure_pascal(f_pres_adc, &t_fine);
-        printf("Presion: %f\n ajustable", (float)f_pres);
+        printf("Presion ajustable: %f\n", (float)f_pres);
 
         bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][0], &tmp, 1);
         f_hum_adc = f_hum_adc | tmp << 8;
@@ -1439,7 +1430,7 @@ void bme_read_data(void) {
 
 
         uint32_t f_hum = bme_hum_percent(f_hum_adc, &t_fine, f_temp);
-        printf("Humedad: %f\n ajustable", (float)f_hum);
+        printf("Humedad ajustable: %f\n", (float)f_hum);
 
         bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][0], &tmp, 1);
         f_gas_adc = f_gas_adc | tmp << 2;
@@ -1451,62 +1442,62 @@ void bme_read_data(void) {
         f_gas_range = f_gas_range | (tmp & 0x0F);
 
         uint32_t f_gas = bme_gas_resistance(f_gas_adc, f_gas_range);
+        printf("Resistencia de gas ajustable: %f\n", (float)f_gas);
+        printf("\n");
 
-        }
         //TODO: get 5 peaks from all lists
     }
     //if mode is parallel
     else if (cur_mode == 2)
     {
-        for(;;){
-            bme_parallel_mode();
+        bme_parallel_mode();
 
-            for(int i = 0; i < 3; i++){
-                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
-                p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
-                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
-                p_temp_adc[i] = p_temp_adc[i] | tmp << 4;
-                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1); //xlsb
-                p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
+        for(int i = 0; i < 3; i++){
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
+            p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
+            p_temp_adc[i] = p_temp_adc[i] | tmp << 4;
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1); //xlsb
+            p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
 
-                temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
-                printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
+            temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
+            printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
 
-                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
-                p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
-                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1); //lsb
-                p_pres_adc[i] = p_pres_adc[i] | tmp << 4;
-                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1); //xlsb
-                p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
+            p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1); //lsb
+            p_pres_adc[i] = p_pres_adc[i] | tmp << 4;
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1); //xlsb
+            p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
 
-                pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
-                printf("Presion: %f\n ajustable", (float)pres_parallel[i]);
+            pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
+            printf("Presion ajustable: %f\n", (float)pres_parallel[i]);
 
-                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
-                p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
-                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1); //lsb
-                p_hum_adc[i] = p_hum_adc[i] | tmp;
+            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
+            p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
+            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1); //lsb
+            p_hum_adc[i] = p_hum_adc[i] | tmp;
 
-                hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
-                printf("Humedad: %f\n ajustable", (float)p_hum_adc[i]);
+            hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
+            printf("Humedad ajustable: %f\n", (float)p_hum_adc[i]);
 
-                /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
-                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
-                p_gas_adc[i] = p_gas_adc[i] | tmp << 2;
-                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
-                p_gas_adc[i] = p_gas_adc[i] | (tmp & 0xC0) >> 6;
+            /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
+            p_gas_adc[i] = p_gas_adc[i] | tmp << 2;
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
+            p_gas_adc[i] = p_gas_adc[i] | (tmp & 0xC0) >> 6;
 
-                //gas_range
-                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
-                p_gas_range[i] = p_gas_range[i] | (tmp & 0x0F);
+            //gas_range
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
+            p_gas_range[i] = p_gas_range[i] | (tmp & 0x0F);
 
-                gas_parallel[i] = bme_gas_resistance(p_gas_adc[i], p_gas_range[i]);
-                printf("Resistencia de gas: %f\n ajustable", (float)gas_parallel[i]);
-            }
+            gas_parallel[i] = bme_gas_resistance(p_gas_adc[i], p_gas_range[i]);
+            printf("Resistencia de gas ajustable: %f\n", (float)gas_parallel[i]);
+            printf("\n");
         }
-
         //TODO: get 5 peaks from all lists
     }
+    printf("\n");
 }
 
 void app_main(void) {
@@ -1514,7 +1505,7 @@ void app_main(void) {
     bme_get_chipid();
     bme_softreset();
     bme_get_mode();
-    bme_forced_mode();
+    bme_parallel_mode();
     printf("Comienza lectura\n\n");
     bme_read_data();
 }
