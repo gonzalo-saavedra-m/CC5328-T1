@@ -1190,11 +1190,13 @@ int bme_temp_celsius(uint32_t temp_adc, int *t_fine) {
     var3 = ((var1 >> 1) * (var1 >> 1)) >> 12;
     var3 = ((var3) * ((int32_t)par_t3 << 4)) >> 14;
     *t_fine = (int32_t)(var2 + var3);
+    console.log("t_fine temp: ", t_fine);
     calc_temp = (((*t_fine * 5) + 128) >> 8);
     return calc_temp;
 }
 
 int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
+    console.log("t_fine press: ", t_fine);
     uint8_t addr_par_p1_lsb = 0x8E, addr_par_p1_msb = 0x8F;
     uint8_t addr_par_p2_lsb = 0x90, addr_par_p2_msb = 0x91;
     uint8_t addr_par_p3_lsb = 0x92;
@@ -1395,10 +1397,10 @@ void bme_read_data(void) {
     uint32_t gas_parallel[3] = {0, 0, 0};
 
 
-    int t_fine; //podria haber errores en cómo se llama (&, *, etc.)
-
+    
     //if mode is forced
     if(cur_mode == 1){
+        int t_fine; //podria haber errores en cómo se llama (&, *, etc.)
         bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
@@ -1452,7 +1454,8 @@ void bme_read_data(void) {
     {
         bme_parallel_mode();
 
-        for(int i = 0; i < 3; i++){
+        for(int i = 0; i < 3; i++){  
+            int t_fine;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
             p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
