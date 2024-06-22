@@ -1,20 +1,27 @@
 import sys
 from controllers import *
 from PyQt5 import QtWidgets
+import serial
 
 PORT = 'COM3'
-BMI270_BAUD_RATE = 115200
-BME688_BAUD_RATE = 115200
+BAUD_RATE = 115200
 DATA_SIZE = 100
 
-bmi270_receiver = BMI270_Receiver(PORT, BMI270_BAUD_RATE, DATA_SIZE)
-bme688_receiver = BME688_Receiver(PORT, BME688_BAUD_RATE, DATA_SIZE)
+ser = serial.Serial(PORT, BAUD_RATE, timeout=5)
+bmi270_receiver = BMI270_Receiver(ser, DATA_SIZE)
+bme688_receiver = BME688_Receiver(ser, DATA_SIZE)
 
-app = app = QtWidgets.QApplication(sys.argv)
+def start_callback(selected_sensor: str, powermode: str, **kwargs):
+    if selected_sensor == 'BMI270':
+        print(kwargs)
+    elif selected_sensor == 'BME688':
+        data = bme688_receiver.read(powermode)
+        # TODO: plot data
+
+# Main
+app = QtWidgets.QApplication(sys.argv)
 dialog = QtWidgets.QDialog()
 ui_controller = UI_Controller(parent=dialog)
-ui = ui_controller.ui
-ui.setupUi(dialog)
+ui_controller.set_start_callback(start_callback)
 dialog.show()
-ui_controller.setSignals()
-ui_controller = UI_Controller()
+sys.exit(app.exec_())

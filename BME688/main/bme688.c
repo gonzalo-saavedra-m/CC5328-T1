@@ -48,6 +48,11 @@ uint8_t ctrl_meas = 0x74;
 
 float task_delay_ms = 1000;
 
+int serial_read(char *buffer, int size){
+    int len = uart_read_bytes(UART_NUM, (uint8_t*)buffer, size, pdMS_TO_TICKS(1000));
+    return len;
+}
+
 esp_err_t sensor_init(void) {
     int i2c_master_port = I2C_NUM_0;
     i2c_config_t conf;
@@ -453,6 +458,23 @@ void bme68x_set_heatr_conf(
     }
 }
 
+void bme_sleep(void) {
+    uint8_t tmp_pow_mode;
+    uint8_t pow_mode = 0;
+    do {
+        ret = bme_i2c_read(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1);
+
+        if (ret == ESP_OK) { //si es que está seteado algun power mode
+            // Se pone en sleep
+            pow_mode = (tmp_pow_mode & 0x03); //mask 0b00000011 (mantiene los dos bits menos significativos)
+            if (pow_mode != 0) {
+                tmp_pow_mode &= ~0x03; //setea tmp_pow_mode en 0b00000000
+                ret = bme_i2c_write(I2C_NUM_0, &ctrl_meas, &tmp_pow_mode, 1); //se escribe el sleep mode
+            }
+        }
+    } while ((pow_mode != 0x0) && (ret == ESP_OK));
+}
+
 void bme_parallel_mode(void){
      // Datasheet[33]
     uint8_t gas_wait_shared = 0x6E;
@@ -559,13 +581,13 @@ int bme_temp_celsius(uint32_t temp_adc, int *t_fine) {
     var3 = ((var1 >> 1) * (var1 >> 1)) >> 12;
     var3 = ((var3) * ((int32_t)par_t3 << 4)) >> 14;
     *t_fine = (int32_t)(var2 + var3);
-    console.log("t_fine temp: ", t_fine);
+    printf("t_fine temp: %d", *t_fine);
     calc_temp = (((*t_fine * 5) + 128) >> 8);
     return calc_temp;
 }
 
 int bme_pressure_pascal(uint32_t pres_adc, int *t_fine) {
-    console.log("t_fine press: ", t_fine);
+    printf("t_fine press: %d", *t_fine);
     uint8_t addr_par_p1_lsb = 0x8E, addr_par_p1_msb = 0x8F;
     uint8_t addr_par_p2_lsb = 0x90, addr_par_p2_msb = 0x91;
     uint8_t addr_par_p3_lsb = 0x92;
@@ -712,12 +734,8 @@ int bme_gas_resistance(uint32_t gas_adc, uint32_t gas_range) {
 uint8_t bme_get_mode(void) {
     uint8_t reg_mode = 0x74;
     uint8_t tmp;
-
     ret = bme_i2c_read(I2C_NUM_0, &reg_mode, &tmp, 1);
-
     tmp = tmp & 0x3;
-
-    printf("Valor de BME MODE: %2X \n\n", tmp);
     return tmp;
 }
 
@@ -766,7 +784,7 @@ void bme_read_data(void) {
     uint32_t gas_parallel[3] = {0, 0, 0};
 
 
-    
+
     //if mode is forced
     if(cur_mode == 1){
         int t_fine; //podria haber errores en cómo se llama (&, *, etc.)
@@ -823,7 +841,7 @@ void bme_read_data(void) {
     {
         bme_parallel_mode();
 
-        for(int i = 0; i < 3; i++){  
+        for(int i = 0; i < 3; i++) {
             int t_fine;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
             p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
@@ -873,12 +891,41 @@ void bme_read_data(void) {
 }
 
 void app_main(void) {
-    // TODO: Escuchar configuración del controller
     ESP_ERROR_CHECK(sensor_init());
     bme_get_chipid();
+    // while(1) {
+    //     // 1: Check if continue or not
+    //     char continueResponse[1];
+    //     uart_write_bytes(UART_NUM,"CONTINUE? (Y/N):\0",17);
+    //     while(1) {
+    //         int rLen = serial_read(continueResponse, 1);
+    //         if (rLen > 0) break;
+    //     }
+    //     if (continueResponse[0] == 'N' || continueResponse[0] == 'n') break;
+    //     if (continueResponse[0] != 'Y' && continueResponse[0] != 'y') continue;
+    //     // 2: Select power mode
+    //     bme_softreset();
+    //     bme_get_mode();
+    //     char powermodeResponse[1];
+    //     uart_write_bytes(UART_NUM,"SELECT_POWER_MODE\0",18);
+    //     while(1) {
+    //         int rLen = serial_read(powermodeResponse, 1);
+    //         if (rLen == 0) break;
+    //     }
+    //     if (powermodeResponse[0] == 'S') {
+    //         bme_sleep();
+    //         continue;
+    //     }
+    //     if (powermodeResponse[0] == 'F') {
+    //         bme_forced_mode();
+    //     }
+    //     if (powermodeResponse[0] == 'P') {
+    //         bme_parallel_mode();
+    //     }
+    //     bme_read_data();
+    // }
     bme_softreset();
     bme_get_mode();
-    bme_parallel_mode();
-    printf("Comienza lectura\n\n");
+    bme_forced_mode();
     bme_read_data();
 }

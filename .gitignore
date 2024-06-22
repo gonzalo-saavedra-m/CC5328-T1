@@ -1,3 +1,4 @@
 build/
 .vscode/
 data.txt
+__pycache__/

@@ -20,8 +20,8 @@ BEGIN_PEAKS = pack('12s', 'BEGIN_PEAKS\0'.encode())
 FINISHED_PEAKS = b'FINISHED_PEAKS'
 
 class BMI270_Receiver():
-    def __init__(self, port: str, baud_rate: int, data_size: int=100) -> None:
-        self.ser = serial.Serial(port, baud_rate, timeout=5)
+    def __init__(self, ser, data_size: int=100) -> None:
+        self.ser = ser
         self.reset_data() # Initialize the data dictionaries.
         self.data_size = data_size
 
@@ -82,7 +82,7 @@ class BMI270_Receiver():
         except Exception as e:
             print(f'Problem reading data entry: {entry}. Skipping...')
 
-    def main(self) -> None:
+    def main(self, powermode) -> dict:
         try:
             while True:
                 if not self.in_waiting: continue
