@@ -33,6 +33,8 @@
 #define ACK_VAL 0x0
 #define NACK_VAL 0x1
 
+
+const size_t DATA_LENGTH = 100;
 esp_err_t ret = ESP_OK;
 esp_err_t ret2 = ESP_OK;
 
@@ -47,6 +49,20 @@ uint8_t ctrl_hum = 0x72;
 uint8_t ctrl_meas = 0x74;
 
 float task_delay_ms = 1000;
+
+static void uart_setup() {
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    };
+    uart_param_config(UART_NUM_0, &uart_config);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_driver_install(UART_NUM_1, BUF_SIZE * 2, 0, 0, NULL, 0);
+}
 
 int serial_read(char *buffer, int size){
     int len = uart_read_bytes(UART_NUM, (uint8_t*)buffer, size, pdMS_TO_TICKS(1000));
@@ -748,8 +764,12 @@ void bme_read_data(void) {
     // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=23
 
     uint8_t tmp;
-
-    // Se obtienen los datos de temperatura
+    //f_temp, f_pres, f_hum, f_gas, temp_parallel, pres_parallel, hum_parallel, gas_parallel
+    uint32_t* top5 = (uint32_t*) malloc(5 * sizeof(uint32_t)); //se sobreescribe por dato
+    uint32_t data_temp[DATA_LENGTH];
+    uint32_t data_pres[DATA_LENGTH];
+    uint32_t data_hum[DATA_LENGTH];
+    uint32_t data_gas[DATA_LENGTH];
 
     // para parallel se usan los fields de 0 a 2
     //field 0 -> {0x22, 0x23, 0x24}
@@ -761,9 +781,6 @@ void bme_read_data(void) {
     uint8_t parallel_gas_addr[3][3] = {{0x2C, 0x2D}, {0x3D, 0x3E}, {0x4E, 0x4F}};
     //gas range is in 2D, 3E, 4F but in <3:0> bits, while gas adc in msb data is in <7:6> bits
     // para forced se usan solo los field 0
-    // uint8_t forced_temp_addr[] = {0x22, 0x23, 0x24};
-    // uint8_t forced_pres_addr[] = {0x1F, 0x20, 0x21};
-    // uint8_t forced_hum_addr[] = {0x25, 0x26, 0x27};
 
     uint8_t cur_mode = bme_get_mode();
     uint32_t f_temp_adc = 0;
@@ -786,106 +803,124 @@ void bme_read_data(void) {
 
 
     //if mode is forced
-    if(cur_mode == 1){
+    if(cur_mode == 1){ //hacer 100 reads
         int t_fine; //podria haber errores en cómo se llama (&, *, etc.)
         bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
+        for(int i = 0; i < DATA_LENGTH; i++){ //100 reads
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][0], &tmp, 1);
+            f_temp_adc = f_temp_adc | tmp << 12;
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][1], &tmp, 1);
+            f_temp_adc = f_temp_adc | tmp << 4;
+            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][2], &tmp, 1);
+            f_temp_adc = f_temp_adc | (tmp & 0xf0) >> 4;
 
-        bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][0], &tmp, 1);
-        f_temp_adc = f_temp_adc | tmp << 12;
-        bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][1], &tmp, 1);
-        f_temp_adc = f_temp_adc | tmp << 4;
-        bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][2], &tmp, 1);
-        f_temp_adc = f_temp_adc | (tmp & 0xf0) >> 4;
+            uint32_t f_temp = bme_temp_celsius(f_temp_adc, &t_fine);
+            printf("Temperatura: %f\n", (float)f_temp / 100);
+            //guarda el dato en data_temp[i]
+            data_temp[i] = f_temp;
 
-        uint32_t f_temp = bme_temp_celsius(f_temp_adc, &t_fine);
-        printf("Temperatura: %f\n", (float)f_temp / 100);
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][0], &tmp, 1);
+            f_pres_adc = f_pres_adc | tmp << 12;
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][1], &tmp, 1);
+            f_pres_adc = f_pres_adc | tmp << 4;
+            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][2], &tmp, 1);
+            f_pres_adc = f_pres_adc | (tmp & 0xf0) >> 4;
 
-        bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][0], &tmp, 1);
-        f_pres_adc = f_pres_adc | tmp << 12;
-        bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][1], &tmp, 1);
-        f_pres_adc = f_pres_adc | tmp << 4;
-        bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][2], &tmp, 1);
-        f_pres_adc = f_pres_adc | (tmp & 0xf0) >> 4;
+            uint32_t f_pres = bme_pressure_pascal(f_pres_adc, &t_fine);
+            printf("Presion ajustable: %f\n", (float)f_pres);
+            //guarda el dato en data_pres[i]
+            data_pres[i] = f_pres;
 
-        uint32_t f_pres = bme_pressure_pascal(f_pres_adc, &t_fine);
-        printf("Presion ajustable: %f\n", (float)f_pres);
+            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][0], &tmp, 1);
+            f_hum_adc = f_hum_adc | tmp << 8;
+            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][1], &tmp, 1);
+            f_hum_adc = f_hum_adc | tmp;
 
-        bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][0], &tmp, 1);
-        f_hum_adc = f_hum_adc | tmp << 8;
-        bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][1], &tmp, 1);
-        f_hum_adc = f_hum_adc | tmp;
+            uint32_t f_hum = bme_hum_percent(f_hum_adc, &t_fine, f_temp);
+            printf("Humedad ajustable: %f\n", (float)f_hum);
+            //guarda el dato en data_hum[i]
+            data_hum[i] = f_hum;
 
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][0], &tmp, 1);
+            f_gas_adc = f_gas_adc | tmp << 2;
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][1], &tmp, 1);
+            f_gas_adc = f_gas_adc | (tmp & 0xC0) >> 6;
 
-        uint32_t f_hum = bme_hum_percent(f_hum_adc, &t_fine, f_temp);
-        printf("Humedad ajustable: %f\n", (float)f_hum);
+            //gas_range
+            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][1], &tmp, 1);
+            f_gas_range = f_gas_range | (tmp & 0x0F);
 
-        bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][0], &tmp, 1);
-        f_gas_adc = f_gas_adc | tmp << 2;
-        bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][1], &tmp, 1);
-        f_gas_adc = f_gas_adc | (tmp & 0xC0) >> 6;
+            uint32_t f_gas = bme_gas_resistance(f_gas_adc, f_gas_range);
+            printf("Resistencia de gas ajustable: %f\n", (float)f_gas);
+            printf("\n");
+            //guarda el dato en data_gas[i]
+            data_gas[i] = f_gas;
 
-        //gas_range
-        bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][1], &tmp, 1);
-        f_gas_range = f_gas_range | (tmp & 0x0F);
-
-        uint32_t f_gas = bme_gas_resistance(f_gas_adc, f_gas_range);
-        printf("Resistencia de gas ajustable: %f\n", (float)f_gas);
-        printf("\n");
-
-        //TODO: get 5 peaks from all lists
+            //TODO: get 5 peaks from all lists
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
+        }
     }
     //if mode is parallel
     else if (cur_mode == 2)
     {
         bme_parallel_mode();
+        int readings = 0;
+        while (readings < DATA_LENGTH) {
+            for(int i = 0; i < 3; i++) {
+                int t_fine;
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
+                p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
+                p_temp_adc[i] = p_temp_adc[i] | tmp << 4;
+                bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1); //xlsb
+                p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
 
-        for(int i = 0; i < 3; i++) {
-            int t_fine;
-            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
-            p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
-            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
-            p_temp_adc[i] = p_temp_adc[i] | tmp << 4;
-            bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][2], &tmp, 1); //xlsb
-            p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
+                temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
+                printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
+                data_temp[readings] = temp_parallel[i];
 
-            temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
-            printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
+                p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1); //lsb
+                p_pres_adc[i] = p_pres_adc[i] | tmp << 4;
+                bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1); //xlsb
+                p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
 
-            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
-            p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
-            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1); //lsb
-            p_pres_adc[i] = p_pres_adc[i] | tmp << 4;
-            bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][2], &tmp, 1); //xlsb
-            p_pres_adc[i] = p_pres_adc[i] | (tmp & 0xf0) >> 4;
+                pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
+                printf("Presion ajustable: %f\n", (float)pres_parallel[i]);
+                data_pres[readings] = pres_parallel[i];
 
-            pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
-            printf("Presion ajustable: %f\n", (float)pres_parallel[i]);
+                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
+                p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
+                bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1); //lsb
+                p_hum_adc[i] = p_hum_adc[i] | tmp;
 
-            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
-            p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
-            bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1); //lsb
-            p_hum_adc[i] = p_hum_adc[i] | tmp;
+                hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
+                printf("Humedad ajustable: %f\n", (float)hum_parallel[i]);
+                data_hum[readings] = hum_parallel[i];
 
-            hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
-            printf("Humedad ajustable: %f\n", (float)p_hum_adc[i]);
+                /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
+                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
+                p_gas_adc[i] = p_gas_adc[i] | tmp << 2;
+                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
+                p_gas_adc[i] = p_gas_adc[i] | (tmp & 0xC0) >> 6;
 
-            /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
-            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
-            p_gas_adc[i] = p_gas_adc[i] | tmp << 2;
-            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
-            p_gas_adc[i] = p_gas_adc[i] | (tmp & 0xC0) >> 6;
+                //gas_range
+                bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
+                p_gas_range[i] = p_gas_range[i] | (tmp & 0x0F);
 
-            //gas_range
-            bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][1], &tmp, 1); //lsb
-            p_gas_range[i] = p_gas_range[i] | (tmp & 0x0F);
+                gas_parallel[i] = bme_gas_resistance(p_gas_adc[i], p_gas_range[i]);
+                printf("Resistencia de gas ajustable: %f\n", (float)gas_parallel[i]);
+                printf("\n");
+                data_gas[readings] = gas_parallel[i];
 
-            gas_parallel[i] = bme_gas_resistance(p_gas_adc[i], p_gas_range[i]);
-            printf("Resistencia de gas ajustable: %f\n", (float)gas_parallel[i]);
-            printf("\n");
+                readings++;
+            }
+            //TODO: get 5 peaks from all lists
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
         }
-        //TODO: get 5 peaks from all lists
     }
     printf("\n");
 }
@@ -893,37 +928,38 @@ void bme_read_data(void) {
 void app_main(void) {
     ESP_ERROR_CHECK(sensor_init());
     bme_get_chipid();
-    // while(1) {
-    //     // 1: Check if continue or not
-    //     char continueResponse[1];
-    //     uart_write_bytes(UART_NUM,"CONTINUE? (Y/N):\0",17);
-    //     while(1) {
-    //         int rLen = serial_read(continueResponse, 1);
-    //         if (rLen > 0) break;
-    //     }
-    //     if (continueResponse[0] == 'N' || continueResponse[0] == 'n') break;
-    //     if (continueResponse[0] != 'Y' && continueResponse[0] != 'y') continue;
-    //     // 2: Select power mode
-    //     bme_softreset();
-    //     bme_get_mode();
-    //     char powermodeResponse[1];
-    //     uart_write_bytes(UART_NUM,"SELECT_POWER_MODE\0",18);
-    //     while(1) {
-    //         int rLen = serial_read(powermodeResponse, 1);
-    //         if (rLen == 0) break;
-    //     }
-    //     if (powermodeResponse[0] == 'S') {
-    //         bme_sleep();
-    //         continue;
-    //     }
-    //     if (powermodeResponse[0] == 'F') {
-    //         bme_forced_mode();
-    //     }
-    //     if (powermodeResponse[0] == 'P') {
-    //         bme_parallel_mode();
-    //     }
-    //     bme_read_data();
-    // }
+    uart_setup();
+    while(1) {
+        // 1: Check if continue or not
+        char continueResponse[1];
+        uart_write_bytes(UART_NUM,"CONTINUE? (Y/N):\0",17);
+        while(1) {
+            int rLen = serial_read(continueResponse, 1);
+            if (rLen > 0) break;
+        }
+        if (continueResponse[0] == 'N' || continueResponse[0] == 'n') break;
+        if (continueResponse[0] != 'Y' && continueResponse[0] != 'y') continue;
+        // 2: Select power mode
+        bme_softreset();
+        bme_get_mode();
+        char powermodeResponse[1];
+        uart_write_bytes(UART_NUM,"SELECT_POWER_MODE\0",18);
+        while(1) {
+            int rLen = serial_read(powermodeResponse, 1);
+            if (rLen == 0) break;
+        }
+        if (powermodeResponse[0] == 'S') {
+            bme_sleep();
+            continue;
+        }
+        if (powermodeResponse[0] == 'F') {
+            bme_forced_mode();
+        }
+        if (powermodeResponse[0] == 'P') {
+            bme_parallel_mode();
+        }
+        bme_read_data();
+    }
     bme_softreset();
     bme_get_mode();
     bme_forced_mode();
