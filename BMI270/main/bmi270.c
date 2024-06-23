@@ -618,24 +618,10 @@ void initialization(void)
     printf("Inicializando ...\n");
 
     bmi_write(I2C_NUM_0, &reg_pwr_conf_advpowersave, &val_pwr_conf_advpowersave, 1);
-    // ret= bmi_read(I2C_NUM_0, &reg_pwr_conf_advpowersave, &tmp,1);
-    //  if(ret != ESP_OK){
-    //      printf("Error en PWR_CONF: %s \n",esp_err_to_name(ret));
-    //  }
-    //  printf("valor de PWR_CONF: %2X \n",tmp);
-
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     ret = bmi_write(I2C_NUM_0, &reg_init_ctrl, &val_init_ctrl, 1);
-    // if(ret != ESP_OK){
-    //     printf("Error en write2: %s \n",esp_err_to_name(ret));
-    // }
-    // else {
-    //      printf("Init_ctrl = 0\n");
-    // }
-
     int config_size = sizeof(bmi270_config_file);
-    // printf("Tamano config_file: %d\n\n",config_size);
 
     ret = bmi_write(I2C_NUM_0, &reg_init_data, (uint8_t *)bmi270_config_file, config_size);
     if (ret != ESP_OK)
@@ -1112,22 +1098,7 @@ void app_main(void)
                 }
             }
         }
-        uart_write_bytes(UART_NUM,"READY_TO_START\0",15);
-        char dataResponse1[15];
-        while(1) {
-            int rLen = serial_read(dataResponse1, 15);
-            if (rLen > 0) {
-                if ((strcmp(dataResponse1, "BEGIN_READINGS") == 0) || (strcmp(dataResponse1, "STOP__READINGS") == 0)) {
-                    break;
-                }
-            }
-        }
-        if (strcmp(dataResponse1, "BEGIN_READINGS") == 0) {
-            lectura();
-            printf("Lectura finalizada, volviendo al comienzo del loop...\n");
-        } else {
-            break;
-        }
+        lectura();
     }
 }
 

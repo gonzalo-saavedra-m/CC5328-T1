@@ -2,6 +2,7 @@ import sys
 from controllers import *
 from PyQt5 import QtWidgets
 import serial
+from pprint import pprint
 
 PORT = 'COM3'
 BAUD_RATE = 115200
@@ -13,7 +14,8 @@ bme688_receiver = BME688_Receiver(ser, DATA_SIZE)
 
 def start_callback(selected_sensor: str, powermode: str, **kwargs):
     if selected_sensor == 'BMI270':
-        print(kwargs)
+        data = bmi270_receiver.read(powermode)
+        pprint(data)
     elif selected_sensor == 'BME688':
         data = bme688_receiver.read(powermode)
         # TODO: plot data

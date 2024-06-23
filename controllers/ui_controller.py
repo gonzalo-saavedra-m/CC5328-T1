@@ -13,7 +13,6 @@ class UI_Controller():
 
     def start(self):
         kwargs = {}
-        print('Starting...')
         selected_sensor = self.ui.sensor_selector.currentText()
         kwargs['selected_sensor'] = selected_sensor
         if selected_sensor == 'BMI270':
@@ -34,5 +33,4 @@ if __name__ == "__main__":
     dialog = QtWidgets.QDialog()
     ui_controller = UI_Controller(parent=dialog)
     dialog.show()
-    ui_controller.set_signals()
     sys.exit(app.exec_())
