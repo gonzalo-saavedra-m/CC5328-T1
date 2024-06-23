@@ -33,8 +33,6 @@
 #define ACK_VAL 0x0
 #define NACK_VAL 0x1
 
-
-const size_t DATA_LENGTH = 100;
 esp_err_t ret = ESP_OK;
 esp_err_t ret2 = ESP_OK;
 
@@ -756,20 +754,29 @@ uint8_t bme_get_mode(void) {
 }
 
 //TODO: get 5 peaks from a list
+int compare_desc(const void* a, const void* b){
+    return (*(uint32_t*)b - *(uint32_t*)a);
+}
+
+void calc_top5(uint32_t* data, uint32_t* top5, int length){
+    qsort(data, length, sizeof(uint32_t), compare_desc);
+    for(int i = 0; i < 5; i++){
+        top5[i] = data[i];
+    }
+}
 
 
-
-void bme_read_data(void) {
+void bme_read_data(int length) {
     // Datasheet[23:41]
     // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=23
 
     uint8_t tmp;
-    //f_temp, f_pres, f_hum, f_gas, temp_parallel, pres_parallel, hum_parallel, gas_parallel
+    //data_temp, data_pres, data_hum, data_gas
     uint32_t* top5 = (uint32_t*) malloc(5 * sizeof(uint32_t)); //se sobreescribe por dato
-    uint32_t data_temp[DATA_LENGTH];
-    uint32_t data_pres[DATA_LENGTH];
-    uint32_t data_hum[DATA_LENGTH];
-    uint32_t data_gas[DATA_LENGTH];
+    uint32_t* data_temp = (uint32_t*) malloc(length * sizeof(uint32_t));
+    uint32_t* data_pres = (uint32_t*) malloc(length * sizeof(uint32_t));
+    uint32_t* data_hum = (uint32_t*) malloc(length * sizeof(uint32_t));
+    uint32_t* data_gas = (uint32_t*) malloc(length * sizeof(uint32_t));
 
     // para parallel se usan los fields de 0 a 2
     //field 0 -> {0x22, 0x23, 0x24}
@@ -808,7 +815,7 @@ void bme_read_data(void) {
         bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
-        for(int i = 0; i < DATA_LENGTH; i++){ //100 reads
+        for(int i = 0; i < length; i++){ //100 reads
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][0], &tmp, 1);
             f_temp_adc = f_temp_adc | tmp << 12;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][1], &tmp, 1);
@@ -857,8 +864,6 @@ void bme_read_data(void) {
             printf("\n");
             //guarda el dato en data_gas[i]
             data_gas[i] = f_gas;
-
-            //TODO: get 5 peaks from all lists
             vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
         }
     }
@@ -867,7 +872,7 @@ void bme_read_data(void) {
     {
         bme_parallel_mode();
         int readings = 0;
-        while (readings < DATA_LENGTH) {
+        while (readings < length) {
             for(int i = 0; i < 3; i++) {
                 int t_fine;
                 bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
@@ -923,6 +928,47 @@ void bme_read_data(void) {
         }
     }
     printf("\n");
+    
+    const char* dataToSend;
+    uart_write_bytes(UART_NUM, "SENDING\0", 5);
+    //send data
+    dataToSend = (const char*)data_temp;
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+
+    dataToSend = (const char*)data_pres;
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+
+    dataToSend = (const char*)data_hum;
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+
+    dataToSend = (const char*)data_gas;
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+
+    //Top5 and send 
+    calc_top5(data_temp, top5, length);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+
+    calc_top5(data_pres, top5, length);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+
+    calc_top5(data_hum, top5, length);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+
+    calc_top5(data_gas, top5, length);
+    dataToSend = (const char*)top5;
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+
+    uart_write_bytes(UART_NUM, "FINISHED\0", 4);
+
+    //free memory
+    free(top5);
+    free(data_temp);
+    free(data_pres);
+    free(data_hum);
+    free(data_gas);
 }
 
 void app_main(void) {
