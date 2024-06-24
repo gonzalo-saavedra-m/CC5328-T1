@@ -44,6 +44,7 @@ class UI_Controller():
         self.start_callback = callback
 
     def start(self):
+        self.clear_plots()
         kwargs = {}
         selected_sensor = self.ui.sensor_selector.currentText()
         kwargs['selected_sensor'] = selected_sensor
@@ -58,7 +59,7 @@ class UI_Controller():
         self.start_callback(**kwargs)
 
     def show_bmi270_data(self,
-                        #  acc: dict, gyr: dict, RMS: dict, FFT: dict, peaks: dict
+                         acc: dict, gyr: dict, RMS: dict, FFT: dict, peaks: dict
                          ):
         """plots the data from the BMI270 sensor.
         acc: { x: [], y: [], z: [] },
@@ -67,12 +68,36 @@ class UI_Controller():
         FFT: { acc_x: { r: [], i: [] }, acc_y: { r: [], i: [] }, acc_z: { r: [], i: [] } },
         peaks: { acc_x: [], acc_y: [], acc_z: [], gyr_x: [], gyr_y: [], gyr_z: [], RMS.acc_x: [], RMS.acc_y: [], RMS.acc_z: [] }
         """
-        time = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        widget_number = 1
+        for i, coord in enumerate(['x', 'y', 'z']):
+            self.set_line_plot(acc[coord], i*2 + 1, f'Accelerometer {coord.upper()}')
+            self.set_line_plot(gyr[coord], i*2 + 2, f'Gyroscope {coord.upper()}')
+            self.set_line_plot(RMS[f'acc_{coord}'], i + 7, f'RMS Accelerometer {coord.upper()}')
+            self.set_2d_plot(FFT[f'acc_{coord}']['r'], FFT[f'acc_{coord}']['i'], i + 10, f'FFT Accelerometer {coord.upper()}')
+
+    def set_2d_plot(self, x: list, y: list, widget_number: int, title: str):
         canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')
         label = self.labels.get(f'datalabel_{widget_number}')
         if canvas and label:
             canvas.axes.clear()
-            canvas.axes.plot(time)
+            canvas.axes.plot(x, y)
             canvas.draw()
-            label.setText('Sample data')
+            label.setText(title)
+
+    def set_line_plot(self, data: list, widget_number: int, title: str):
+        canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')
+        label = self.labels.get(f'datalabel_{widget_number}')
+        if canvas and label:
+            canvas.axes.clear()
+            canvas.axes.plot(data)
+            canvas.draw()
+            label.setText(title)
+
+    def clear_plots(self):
+        for i in range(1, 13):
+            canvas = self.canvases.get(f'widget_{i}')
+            label = self.labels.get(f'datalabel_{i}')
+            if canvas:
+                canvas.axes.clear()
+                canvas.draw()
+            if label:
+                label.setText("")

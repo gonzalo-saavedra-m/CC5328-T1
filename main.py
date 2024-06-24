@@ -17,9 +17,8 @@ ui_controller = UI_Controller(parent=dialog)
 
 def start_callback(selected_sensor: str, powermode: str, **kwargs):
     if selected_sensor == 'BMI270':
-        # data = bmi270_receiver.read(powermode, **kwargs)
-        # ui_controller.show_bmi270_data(**data)
-        ui_controller.show_bmi270_data()
+        data = bmi270_receiver.read(powermode, **kwargs)
+        ui_controller.show_bmi270_data(**data)
     elif selected_sensor == 'BME688':
         data = bme688_receiver.read(powermode)
         # TODO: plot data
