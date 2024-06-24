@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1356</width>
+    <width>1684</width>
     <height>893</height>
    </rect>
   </property>
@@ -628,6 +628,84 @@
     <rect>
      <x>1090</x>
      <y>680</y>
+     <width>191</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QWidget" name="widget_13" native="true">
+   <property name="geometry">
+    <rect>
+     <x>1380</x>
+     <y>110</y>
+     <width>291</width>
+     <height>211</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: rgb(106, 106, 106);</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="widget_14" native="true">
+   <property name="geometry">
+    <rect>
+     <x>1380</x>
+     <y>330</y>
+     <width>291</width>
+     <height>211</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: rgb(106, 106, 106);</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="datalabel_13">
+   <property name="geometry">
+    <rect>
+     <x>1420</x>
+     <y>120</y>
+     <width>191</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLabel" name="datalabel_14">
+   <property name="geometry">
+    <rect>
+     <x>1420</x>
+     <y>340</y>
+     <width>191</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QWidget" name="widget_15" native="true">
+   <property name="geometry">
+    <rect>
+     <x>1380</x>
+     <y>550</y>
+     <width>291</width>
+     <height>211</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: rgb(106, 106, 106);</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="datalabel_15">
+   <property name="geometry">
+    <rect>
+     <x>1420</x>
+     <y>560</y>
      <width>191</width>
      <height>16</height>
     </rect>

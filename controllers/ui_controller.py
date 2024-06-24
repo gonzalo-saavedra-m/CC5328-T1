@@ -1,15 +1,8 @@
 from controllers.ui_embebidos import Ui_Dialog
-import pyqtgraph as pg
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.ticker as ticker
-import numpy as np
-import queue
-
-from PyQt5 import QtCore, QtWidgets, QtGui, uic
-from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QVBoxLayout
 
 class MplCanvas(FigureCanvas):
@@ -30,7 +23,7 @@ class UI_Controller():
         self.reference_plot = None
 
         # Create canvas for each widget
-        for i in range(1, 13):
+        for i in range(1, 16):
             widget = getattr(self.ui, f'widget_{i}')
             label = getattr(self.ui, f'datalabel_{i}')
             canvas = MplCanvas(self, width=5, height=4, dpi=100)
@@ -73,6 +66,8 @@ class UI_Controller():
             self.set_line_plot(gyr[coord], i*2 + 2, f'Gyroscope {coord.upper()}')
             self.set_line_plot(RMS[f'acc_{coord}'], i + 7, f'RMS Accelerometer {coord.upper()}')
             self.set_2d_plot(FFT[f'acc_{coord}']['r'], FFT[f'acc_{coord}']['i'], i + 10, f'FFT Accelerometer {coord.upper()}')
+            self.set_scatter_plot(peaks[f'acc_{coord}'], i + 13, f'Peaks Accelerometer {coord.upper()}')
+
 
     def set_2d_plot(self, x: list, y: list, widget_number: int, title: str):
         canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')
@@ -89,6 +84,15 @@ class UI_Controller():
         if canvas and label:
             canvas.axes.clear()
             canvas.axes.plot(data)
+            canvas.draw()
+            label.setText(title)
+
+    def set_scatter_plot(self, data: list, widget_number: int, title: str):
+        canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')
+        label = self.labels.get(f'datalabel_{widget_number}')
+        if canvas and label:
+            canvas.axes.clear()
+            canvas.axes.scatter(range(len(data)), data)
             canvas.draw()
             label.setText(title)
 
