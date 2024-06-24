@@ -60,7 +60,7 @@ class BMI270_Receiver():
         except:
             pass
 
-    def read(self, powermode) -> dict:
+    def read(self, powermode, **kwargs) -> dict:
         print('Received powermode:', powermode)
         while True:
             if not self.in_waiting: continue
