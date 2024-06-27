@@ -754,12 +754,12 @@ uint8_t bme_get_mode(void) {
 }
 
 //TODO: get 5 peaks from a list
-int compare_desc(const void* a, const void* b){
-    return (*(uint32_t*)b - *(uint32_t*)a);
+float compare_desc(const void* a, const void* b){
+    return (*(float*)b - *(float*)a);
 }
 
-void calc_top5(uint32_t* data, uint32_t* top5, int length){
-    qsort(data, length, sizeof(uint32_t), compare_desc);
+void calc_top5(float* data, float* top5, int length){
+    qsort(data, length, sizeof(float), compare_desc);
     for(int i = 0; i < 5; i++){
         top5[i] = data[i];
     }
@@ -772,11 +772,11 @@ void bme_read_data(int length) {
 
     uint8_t tmp;
     //data_temp, data_pres, data_hum, data_gas
-    uint32_t* top5 = (uint32_t*) malloc(5 * sizeof(uint32_t)); //se sobreescribe por dato
-    uint32_t* data_temp = (uint32_t*) malloc(length * sizeof(uint32_t));
-    uint32_t* data_pres = (uint32_t*) malloc(length * sizeof(uint32_t));
-    uint32_t* data_hum = (uint32_t*) malloc(length * sizeof(uint32_t));
-    uint32_t* data_gas = (uint32_t*) malloc(length * sizeof(uint32_t));
+    float* top5 = (float*) malloc(5 * sizeof(float)); //se sobreescribe por dato
+    float* data_temp = (float*) malloc(length * sizeof(float));
+    float* data_pres = (float*) malloc(length * sizeof(float));
+    float* data_hum = (float*) malloc(length * sizeof(float));
+    float* data_gas = (float*) malloc(length * sizeof(float));
 
     // para parallel se usan los fields de 0 a 2
     //field 0 -> {0x22, 0x23, 0x24}
@@ -826,7 +826,7 @@ void bme_read_data(int length) {
             uint32_t f_temp = bme_temp_celsius(f_temp_adc, &t_fine);
             printf("Temperatura: %f\n", (float)f_temp / 100);
             //guarda el dato en data_temp[i]
-            data_temp[i] = f_temp;
+            data_temp[i] = (float)f_temp / 100;
 
             bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][0], &tmp, 1);
             f_pres_adc = f_pres_adc | tmp << 12;
@@ -838,7 +838,7 @@ void bme_read_data(int length) {
             uint32_t f_pres = bme_pressure_pascal(f_pres_adc, &t_fine);
             printf("Presion ajustable: %f\n", (float)f_pres);
             //guarda el dato en data_pres[i]
-            data_pres[i] = f_pres;
+            data_pres[i] = (float)f_pres;
 
             bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][0], &tmp, 1);
             f_hum_adc = f_hum_adc | tmp << 8;
@@ -848,7 +848,7 @@ void bme_read_data(int length) {
             uint32_t f_hum = bme_hum_percent(f_hum_adc, &t_fine, f_temp);
             printf("Humedad ajustable: %f\n", (float)f_hum);
             //guarda el dato en data_hum[i]
-            data_hum[i] = f_hum;
+            data_hum[i] = (float)f_hum;
 
             bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][0], &tmp, 1);
             f_gas_adc = f_gas_adc | tmp << 2;
@@ -863,7 +863,7 @@ void bme_read_data(int length) {
             printf("Resistencia de gas ajustable: %f\n", (float)f_gas);
             printf("\n");
             //guarda el dato en data_gas[i]
-            data_gas[i] = f_gas;
+            data_gas[i] = (float)f_gas;
             vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
         }
     }
@@ -884,7 +884,7 @@ void bme_read_data(int length) {
 
                 temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
                 printf("Temperatura: %f\n", (float)temp_parallel[i] / 100);
-                data_temp[readings] = temp_parallel[i];
+                data_temp[readings] = (float)temp_parallel[i];
 
                 bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
                 p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
@@ -895,7 +895,7 @@ void bme_read_data(int length) {
 
                 pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
                 printf("Presion ajustable: %f\n", (float)pres_parallel[i]);
-                data_pres[readings] = pres_parallel[i];
+                data_pres[readings] = (float)pres_parallel[i];
 
                 bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
                 p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
@@ -904,7 +904,7 @@ void bme_read_data(int length) {
 
                 hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
                 printf("Humedad ajustable: %f\n", (float)hum_parallel[i]);
-                data_hum[readings] = hum_parallel[i];
+                data_hum[readings] = (float)hum_parallel[i];
 
                 /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
                 bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
@@ -919,7 +919,7 @@ void bme_read_data(int length) {
                 gas_parallel[i] = bme_gas_resistance(p_gas_adc[i], p_gas_range[i]);
                 printf("Resistencia de gas ajustable: %f\n", (float)gas_parallel[i]);
                 printf("\n");
-                data_gas[readings] = gas_parallel[i];
+                data_gas[readings] = (float)gas_parallel[i];
 
                 readings++;
             }
@@ -933,33 +933,33 @@ void bme_read_data(int length) {
     uart_write_bytes(UART_NUM, "SENDING\0", 5);
     //send data
     dataToSend = (const char*)data_temp;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
 
     dataToSend = (const char*)data_pres;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
 
     dataToSend = (const char*)data_hum;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
 
     dataToSend = (const char*)data_gas;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
 
     //Top5 and send 
     calc_top5(data_temp, top5, length);
     dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
     calc_top5(data_pres, top5, length);
     dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
     calc_top5(data_hum, top5, length);
     dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
     calc_top5(data_gas, top5, length);
     dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(uint32_t));
+    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
 
     uart_write_bytes(UART_NUM, "FINISHED\0", 4);
 
@@ -1004,10 +1004,10 @@ void app_main(void) {
         if (powermodeResponse[0] == 'P') {
             bme_parallel_mode();
         }
-        bme_read_data();
+        bme_read_data(50);
     }
     bme_softreset();
     bme_get_mode();
     bme_forced_mode();
-    bme_read_data();
+    bme_read_data(50);
 }
