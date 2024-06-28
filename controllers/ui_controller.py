@@ -37,7 +37,6 @@ class UI_Controller():
         self.start_callback = callback
 
     def start(self):
-        self.clear_plots()
         kwargs = {}
         selected_sensor = self.ui.sensor_selector.currentText()
         kwargs['selected_sensor'] = selected_sensor
@@ -68,9 +67,18 @@ class UI_Controller():
             self.set_2d_plot(FFT[f'acc_{coord}']['r'], FFT[f'acc_{coord}']['i'], i + 10, f'FFT Accelerometer {coord.upper()}')
             self.set_scatter_plot(peaks[f'acc_{coord}'], i + 13, f'Peaks Accelerometer {coord.upper()}')
 
-    def show_bme688_data(self, **kwargs):
-        pass
-
+    def show_bme688_data(self,
+        temp, pres, hum, gas, top5_temp, top5_pres, top5_hum, top5_gas
+                         ):
+        self.set_line_plot(temp, 1, 'Temperature')
+        self.set_line_plot(pres, 2, 'Pressure')
+        self.set_line_plot(hum, 3, 'Humidity')
+        self.set_line_plot(gas, 4, 'Gas resistance')
+        self.set_scatter_plot(top5_temp, 5, 'Top 5 Temperature')
+        self.set_scatter_plot(top5_pres, 6, 'Top 5 Pressure')
+        self.set_scatter_plot(top5_hum, 7, 'Top 5 Humidity')
+        self.set_scatter_plot(top5_gas, 8, 'Top 5 Gas resistance')
+        print(len(top5_temp))
 
     def set_2d_plot(self, x: list, y: list, widget_number: int, title: str):
         canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')

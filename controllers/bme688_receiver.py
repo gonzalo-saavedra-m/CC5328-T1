@@ -1,7 +1,6 @@
 from struct import pack, unpack
 from serial import Serial
 from time import time
-from pprint import pprint
 
 # COMUNICATION CONSTANTS
 F = pack('1s', 'F'.encode())
@@ -28,19 +27,16 @@ class BME688_Receiver():
         self.ser.write(message)
 
     def wait_for_message(self, message: bytes, timeout=5) -> None:
-        print(f'wait_for_message: {message}')
         start_time = time()
         current_time = start_time
         while current_time < start_time + timeout:
             if not self.in_waiting(): continue
             raw_data: bytes = self.ser.readline()
-            print(raw_data)
             if message in raw_data:
                 return
         raise TimeoutError(f'Message {message} not received in {timeout}.')
 
     def parse_line(self, line: bytes) -> tuple:
-        print(line)
         try:
             return unpack('4f', line[:-1])
         except:
@@ -55,7 +51,7 @@ class BME688_Receiver():
         selected_powermode = POWERMODES[powermode]
         self.write(selected_powermode)
         if selected_powermode == S:
-            return {}
+            return None
         temp, pres, hum, gas = [], [], [], []
         self.wait_for_message(b'BEGIN_READINGS')
         while True:
@@ -72,6 +68,7 @@ class BME688_Receiver():
             gas.append(gas_)
         top5_temp, top5_pres, top5_hum, top5_gas = [], [], [], []
         self.wait_for_message(b'BEGIN_TOP')
+        lines_read = 0
         while True:
             if not self.in_waiting(): continue
             raw_data: bytes = self.ser.readline()
@@ -79,11 +76,13 @@ class BME688_Receiver():
                 break
             data = self.parse_line(raw_data)
             if data is None: continue
+            lines_read += 1
             top5_temp_, top5_pres_, top5_hum_, top5_gas_ = data
             top5_temp.append(top5_temp_)
             top5_pres.append(top5_pres_)
             top5_hum.append(top5_hum_)
             top5_gas.append(top5_gas_)
+        print(f'Lines read: {lines_read}')
         data = {
             'temp': temp,
             'pres': pres,
@@ -94,5 +93,4 @@ class BME688_Receiver():
             'top5_hum': top5_hum,
             'top5_gas': top5_gas,
         }
-        pprint(data)
         return data

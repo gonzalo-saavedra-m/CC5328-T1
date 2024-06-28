@@ -21,7 +21,10 @@ def start_callback(selected_sensor: str, powermode: str, **kwargs):
         ui_controller.show_bmi270_data(**data)
     elif selected_sensor == 'BME688':
         data = bme688_receiver.read(powermode)
-        ui_controller.show_bme688_data(**data)
+        if data is None:
+            ui_controller.clear_plots()
+        else:
+            ui_controller.show_bme688_data(**data)
 
 ui_controller.set_start_callback(start_callback)
 dialog.show()
