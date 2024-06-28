@@ -61,7 +61,6 @@ class BMI270_Receiver():
             pass
 
     def read(self, powermode, **kwargs) -> dict:
-        print('Received powermode:', powermode)
         while True:
             if not self.in_waiting: continue
             raw_data: bytes = self.ser.readline()

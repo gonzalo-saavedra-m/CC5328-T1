@@ -68,6 +68,11 @@ class UI_Controller():
             self.set_2d_plot(FFT[f'acc_{coord}']['r'], FFT[f'acc_{coord}']['i'], i + 10, f'FFT Accelerometer {coord.upper()}')
             self.set_scatter_plot(peaks[f'acc_{coord}'], i + 13, f'Peaks Accelerometer {coord.upper()}')
 
+    def show_bme688_data(self, **kwargs):
+        # TODO: Implement this method
+        # raise NotImplementedError
+        pass
+
 
     def set_2d_plot(self, x: list, y: list, widget_number: int, title: str):
         canvas: MplCanvas = self.canvases.get(f'widget_{widget_number}')
