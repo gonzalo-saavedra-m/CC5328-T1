@@ -54,28 +54,25 @@ class BME688_Receiver():
             if not self.in_waiting(): continue
             raw_data: bytes = self.ser.readline()
             data += raw_data
-            if b'FINISHED' in raw_data:
+            if b'F_TOP_GAS' in raw_data:
                 break
-        # Data is between b'SENDING\0' and b'FINISHED\0'
-        filtered_data = data.split(b'SENDING\0')[1].split(b'FINISHED\0')[0]
-        print(len(filtered_data))
-        raw_values = unpack(f'{len(filtered_data)//4}i', filtered_data)
-        readings_len = len(raw_values) - 20
-        top5_gas = raw_values[-5:]
-        top5_hum = raw_values[-10:-5]
-        top5_pres = raw_values[-15:-10]
-        top5_temp = raw_values[-20:-15]
-        readings = raw_values[:readings_len]
-        temp, pres, hum, gas = readings[::4], readings[1::4], readings[2::4], readings[3::4]
+        raw_temp = data.split(b'S_DATA_TEMP')[1].split(b'F_DATA_TEMP')[0]
+        raw_pres = data.split(b'S_DATA_PRES')[1].split(b'F_DATA_PRES')[0]
+        raw_hum = data.split(b'S_DATA_HUM')[1].split(b'F_DATA_HUM')[0]
+        raw_gas = data.split(b'S_DATA_GAS')[1].split(b'F_DATA_GAS')[0]
+        raw_top5_temp = data.split(b'S_TOP_GAS')[1].split(b'F_TOP_GAS')[0]
+        raw_top5_pres = data.split(b'S_TOP_GAS')[1].split(b'F_TOP_GAS')[0]
+        raw_top5_hum = data.split(b'S_TOP_GAS')[1].split(b'F_TOP_GAS')[0]
+        raw_top5_gas = data.split(b'S_TOP_GAS')[1].split(b'F_TOP_GAS')[0]
         data = {
-            'temp': temp,
-            'pres': pres,
-            'hum': hum,
-            'gas': gas,
-            'top5_temp': top5_temp,
-            'top5_pres': top5_pres,
-            'top5_hum': top5_hum,
-            'top5_gas': top5_gas
+            'temp': unpack(f'{len(raw_temp)//4}f', raw_temp),
+            'pres': unpack(f'{len(raw_pres)//4}f', raw_pres),
+            'hum': unpack(f'{len(raw_hum)//4}f', raw_hum),
+            'gas': unpack(f'{len(raw_gas)//4}f', raw_gas),
+            'top5_temp': unpack(f'{len(raw_top5_temp)//4}f', raw_top5_temp),
+            'top5_pres': unpack(f'{len(raw_top5_pres)//4}f', raw_top5_pres),
+            'top5_hum': unpack(f'{len(raw_top5_hum)//4}f', raw_top5_hum),
+            'top5_gas': unpack(f'{len(raw_top5_gas)//4}f', raw_top5_gas),
         }
         pprint(data)
         return data
