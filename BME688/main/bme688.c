@@ -770,7 +770,11 @@ void bme_read_data(int length) {
 
     uint8_t tmp;
     //data_temp, data_pres, data_hum, data_gas
-    float* top5 = (float*) malloc(5 * sizeof(float)); //se sobreescribe por dato
+    float* top5_temp = (float*) malloc(5 * sizeof(float));
+    float* top5_pres = (float*) malloc(5 * sizeof(float));
+    float* top5_hum = (float*) malloc(5 * sizeof(float));
+    float* top5_gas = (float*) malloc(5 * sizeof(float));
+
     float* data_temp = (float*) malloc(length * sizeof(float));
     float* data_pres = (float*) malloc(length * sizeof(float));
     float* data_hum = (float*) malloc(length * sizeof(float));
@@ -805,15 +809,17 @@ void bme_read_data(int length) {
     uint32_t hum_parallel[3] = {0, 0, 0};
     uint32_t gas_parallel[3] = {0, 0, 0};
 
-
-
+    printf("AFUERA DEL IF\n");
+    printf("cur_mode para el if: %d\n", cur_mode);
     //if mode is forced
     if(cur_mode == 1){ //hacer 100 reads
+        printf("DENTRO DEL IF\n");
         int t_fine; //podria haber errores en cómo se llama (&, *, etc.)
-        bme_forced_mode();
         // Datasheet[41]
         // https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme688-ds000.pdf#page=41
         for(int i = 0; i < length; i++){ //100 reads
+            bme_forced_mode();
+            f_temp_adc = 0;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][0], &tmp, 1);
             f_temp_adc = f_temp_adc | tmp << 12;
             bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[0][1], &tmp, 1);
@@ -824,7 +830,9 @@ void bme_read_data(int length) {
             uint32_t f_temp = bme_temp_celsius(f_temp_adc, &t_fine);
             //guarda el dato en data_temp[i]
             data_temp[i] = (float)f_temp / 100;
+            float num = data_temp[i];
 
+            f_pres_adc = 0;
             bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][0], &tmp, 1);
             f_pres_adc = f_pres_adc | tmp << 12;
             bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[0][1], &tmp, 1);
@@ -835,7 +843,7 @@ void bme_read_data(int length) {
             uint32_t f_pres = bme_pressure_pascal(f_pres_adc, &t_fine);
             //guarda el dato en data_pres[i]
             data_pres[i] = (float)f_pres;
-
+            f_hum_adc = 0;
             bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][0], &tmp, 1);
             f_hum_adc = f_hum_adc | tmp << 8;
             bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[0][1], &tmp, 1);
@@ -844,7 +852,7 @@ void bme_read_data(int length) {
             uint32_t f_hum = bme_hum_percent(f_hum_adc, &t_fine, f_temp);
             //guarda el dato en data_hum[i]
             data_hum[i] = (float)f_hum;
-
+            f_gas_adc = 0;
             bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][0], &tmp, 1);
             f_gas_adc = f_gas_adc | tmp << 2;
             bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[0][1], &tmp, 1);
@@ -857,17 +865,18 @@ void bme_read_data(int length) {
             uint32_t f_gas = bme_gas_resistance(f_gas_adc, f_gas_range);
             //guarda el dato en data_gas[i]
             data_gas[i] = (float)f_gas;
-            // vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
         }
     }
     //if mode is parallel
     else if (cur_mode == 2)
     {
+        printf("DENTRO DEL ELSE IF\n");
         bme_parallel_mode();
         int readings = 0;
         while (readings < length) {
             for(int i = 0; i < 3; i++) {
                 int t_fine;
+                p_temp_adc[i] = 0;
                 bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][0], &tmp, 1); //msb
                 p_temp_adc[i] = p_temp_adc[i] | tmp << 12;
                 bme_i2c_read(I2C_NUM_0, &parallel_temp_addr[i][1], &tmp, 1); //lsb
@@ -876,8 +885,10 @@ void bme_read_data(int length) {
                 p_temp_adc[i] = p_temp_adc[i] | (tmp & 0xf0) >> 4;
 
                 temp_parallel[i] = bme_temp_celsius(p_temp_adc[i], &t_fine);
-                data_temp[readings] = (float)temp_parallel[i];
+                // uart_write_bytes(UART_NUM, (float)temp_parallel[i]/100, sizeof(float));
+                data_temp[readings] = (float)temp_parallel[i]/100;
 
+                p_pres_adc[i] = 0;
                 bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][0], &tmp, 1); //msb
                 p_pres_adc[i] = p_pres_adc[i] | tmp << 12;
                 bme_i2c_read(I2C_NUM_0, &parallel_pres_addr[i][1], &tmp, 1); //lsb
@@ -888,6 +899,7 @@ void bme_read_data(int length) {
                 pres_parallel[i] = bme_pressure_pascal(p_pres_adc[i], &t_fine);
                 data_pres[readings] = (float)pres_parallel[i];
 
+                p_hum_adc[i] = 0;
                 bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][0], &tmp, 1); //msb
                 p_hum_adc[i] = p_hum_adc[i] | tmp << 8;
                 bme_i2c_read(I2C_NUM_0, &parallel_hum_addr[i][1], &tmp, 1); //lsb
@@ -896,6 +908,7 @@ void bme_read_data(int length) {
                 hum_parallel[i] = bme_hum_percent(p_hum_adc[i], &t_fine, temp_parallel[i]);
                 data_hum[readings] = (float)hum_parallel[i];
 
+                p_gas_adc[i] = 0;
                 /*Contains the MSB part gas resistance [9:2] of the raw gas resistance. lsb [1:0]*/
                 bme_i2c_read(I2C_NUM_0, &parallel_gas_addr[i][0], &tmp, 1); //msb
                 p_gas_adc[i] = p_gas_adc[i] | tmp << 2;
@@ -915,84 +928,52 @@ void bme_read_data(int length) {
             // vTaskDelay(pdMS_TO_TICKS(1000)); // Esperar 1 segundo entre lecturas
         }
     }
+    else {
+        printf("NO ENTRO\n");
+    }
 
-    //send data
-    const char* dataToSend;
-    uart_write_bytes(UART_NUM, "S_DATA_TEMP", 11);
-    dataToSend = (const char*)data_temp;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_DATA_TEMP", 11);
-
-    uart_write_bytes(UART_NUM, "S_DATA_PRES", 11);
-    dataToSend = (const char*)data_pres;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_DATA_PRES", 11);
-
-    uart_write_bytes(UART_NUM, "S_DATA_HUM", 10);
-    dataToSend = (const char*)data_hum;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_DATA_HUM", 10);
-
-    uart_write_bytes(UART_NUM, "S_DATA_GAS", 10);
-    dataToSend = (const char*)data_gas;
-    uart_write_bytes(UART_NUM, dataToSend, length * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_DATA_GAS", 10);
-
+    // send data
+    float num;
+    uart_write_bytes(UART_NUM, "BEGIN_READINGS\n", 15);
+    for (int i=0; i<length; i++) {
+        num = data_temp[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = data_pres[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = data_hum[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = data_gas[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        uart_write_bytes(UART_NUM, "\n", 1);
+    }
+    uart_write_bytes(UART_NUM, "FINISH_READINGS\n", 16);
     //Top5 and send
-    uart_write_bytes(UART_NUM, "S_TOP_TEMP", 10);
-    calc_top5(data_temp, top5, length);
-    dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_TOP_TEMP", 10);
-
-    uart_write_bytes(UART_NUM, "S_TOP_PRES", 10);
-    calc_top5(data_pres, top5, length);
-    dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_TOP_PRES", 10);
-
-    uart_write_bytes(UART_NUM, "S_TOP_HUM", 9);
-    calc_top5(data_hum, top5, length);
-    dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_TOP_HUM", 9);
-
-    uart_write_bytes(UART_NUM, "S_TOP_GAS", 9);
-    calc_top5(data_gas, top5, length);
-    dataToSend = (const char*)top5;
-    uart_write_bytes(UART_NUM, dataToSend, 5 * sizeof(float));
-    uart_write_bytes(UART_NUM, "F_TOP_GAS", 9);
-    // printf("\n");
-    // for (int i = 0; i < length; i++) {
-    //     printf("Temp: %f\n", data_temp[i]);
-    //     printf("Pres: %f\n", data_pres[i]);
-    //     printf("Hum: %f\n", data_hum[i]);
-    //     printf("Gas: %f\n", data_gas[i]);
-    //     printf("\n");
-    // }
-    // printf('TOP 5\n');
-    // for (int i = 0; i < 5; i++) {
-    //     printf("Temp: %f\n", top5[i]);
-    // }
-    // printf("\n");
-    // for (int i = 0; i < 5; i++) {
-    //     printf("Pres: %f\n", top5[i]);
-    // }
-    // printf("\n");
-    // for (int i = 0; i < 5; i++) {
-    //     printf("Hum: %f\n", top5[i]);
-    // }
-    // printf("\n");
-    // for (int i = 0; i < 5; i++) {
-    //     printf("Gas: %f\n", top5[i]);
-    // }
-
+    calc_top5(data_temp, top5_temp, length);
+    calc_top5(data_pres, top5_pres, length);
+    calc_top5(data_hum, top5_hum, length);
+    calc_top5(data_gas, top5_gas, length);
+    uart_write_bytes(UART_NUM, "BEGIN_TOP\n", 10);
+    for (int i=0; i<5; i++) {
+        num = top5_temp[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = top5_pres[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = top5_hum[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        num = top5_gas[i];
+        uart_write_bytes(UART_NUM, (char*)&num, sizeof(float));
+        uart_write_bytes(UART_NUM, "\n", 1);
+    }
+    uart_write_bytes(UART_NUM, "FINISH_TOP\n", 11);
     //free memory
-    free(top5);
     free(data_temp);
     free(data_pres);
     free(data_hum);
     free(data_gas);
+    free(top5_temp);
+    free(top5_pres);
+    free(top5_hum);
+    free(top5_gas);
 }
 
 void app_main(void) {
@@ -1009,6 +990,7 @@ void app_main(void) {
         }
         if (continueResponse[0] == 'N' || continueResponse[0] == 'n') break;
         if (continueResponse[0] != 'Y' && continueResponse[0] != 'y') continue;
+        printf("Received response: %c\n", continueResponse[0]);
         // 2: Select power mode
         bme_softreset();
         bme_get_mode();
@@ -1016,22 +998,21 @@ void app_main(void) {
         uart_write_bytes(UART_NUM,"SELECT_POWER_MODE\n",18);
         while(1) {
             int rLen = serial_read(powermodeResponse, 1);
-            if (rLen == 0) break;
+            if (rLen > 0) break;
         }
+        printf("Received power mode: %c\n", powermodeResponse[0]);
         if (powermodeResponse[0] == 'S') {
             bme_sleep();
             continue;
         }
         if (powermodeResponse[0] == 'F') {
+            printf("Forced mode\n");
             bme_forced_mode();
         }
         if (powermodeResponse[0] == 'P') {
+            printf("Parallel mode\n");
             bme_parallel_mode();
         }
         bme_read_data(50);
     }
-    // bme_softreset();
-    // bme_get_mode();
-    // bme_forced_mode();
-    // bme_read_data(50);
 }

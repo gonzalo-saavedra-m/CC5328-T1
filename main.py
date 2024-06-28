@@ -10,7 +10,7 @@ DATA_SIZE = 100
 
 ser = serial.Serial(PORT, BAUD_RATE, timeout=5)
 bmi270_receiver = BMI270_Receiver(ser, DATA_SIZE)
-bme688_receiver = BME688_Receiver(ser, DATA_SIZE)
+bme688_receiver = BME688_Receiver(ser)
 app = QtWidgets.QApplication(sys.argv)
 dialog = QtWidgets.QDialog()
 ui_controller = UI_Controller(parent=dialog)

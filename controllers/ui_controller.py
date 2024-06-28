@@ -69,8 +69,6 @@ class UI_Controller():
             self.set_scatter_plot(peaks[f'acc_{coord}'], i + 13, f'Peaks Accelerometer {coord.upper()}')
 
     def show_bme688_data(self, **kwargs):
-        # TODO: Implement this method
-        # raise NotImplementedError
         pass
 
 
