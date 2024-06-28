@@ -108,7 +108,7 @@ class UI_Controller():
             label.setText(title)
 
     def clear_plots(self):
-        for i in range(1, 13):
+        for i in range(1, 16):
             canvas = self.canvases.get(f'widget_{i}')
             label = self.labels.get(f'datalabel_{i}')
             if canvas:

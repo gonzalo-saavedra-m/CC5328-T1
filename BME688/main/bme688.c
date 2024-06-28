@@ -751,7 +751,6 @@ uint8_t bme_get_mode(void) {
     return tmp;
 }
 
-//TODO: get 5 peaks from a list
 float compare_desc(const void* a, const void* b){
     return (*(float*)b - *(float*)a);
 }
